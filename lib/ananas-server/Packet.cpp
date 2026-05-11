@@ -37,6 +37,7 @@ namespace ananas
 
     void AudioPacket::writeHeader()
     {
+        ++header.sequenceNumber;
         header.timestamp += nsPerPacket;
         timestampRemainder += nsPerPacketRemainder;
         if (timestampRemainder > 1) {

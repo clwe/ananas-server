@@ -2,7 +2,6 @@
 #include "Server.h"
 #include <AnanasUtils.h>
 #include <AuthorityInfo.h>
-#include "ServerUtils.h"
 
 namespace ananas::Server
 {
@@ -26,6 +25,10 @@ namespace ananas::Server
     Server::~Server()
     {
         releaseResources();
+
+        for (const auto &t: threads) {
+            t->removeChangeListener(this);
+        }
     }
 
     void Server::prepareToPlay(const int samplesPerBlockExpected, const double sampleRate)
@@ -76,6 +79,8 @@ namespace ananas::Server
 
     void Server::changeListenerCallback(ChangeBroadcaster *source)
     {
+        // If one of the threads announces a change, broadcast that change to
+        // any listeners.
         sendChangeMessage();
     }
 

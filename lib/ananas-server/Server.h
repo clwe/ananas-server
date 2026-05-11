@@ -2,6 +2,7 @@
 #define ANANASSERVER_H
 
 #include <juce_core/juce_core.h>
+#include "ServerUtils.h"
 #include "ClientInfo.h"
 #include "AuthorityInfo.h"
 #include "SwitchInfo.h"

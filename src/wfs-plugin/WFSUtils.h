@@ -182,6 +182,9 @@ namespace ananas::WFS
             49162,
             49162
         };
+
+        static constexpr uint16_t SecondarySourceMessengerLocalPort{49163};
+        static constexpr uint16_t SecondarySourceMessengerRemotePort{49163};
     };
 
     namespace UI

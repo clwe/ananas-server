@@ -51,6 +51,8 @@ namespace ananas
                              public juce::ChangeBroadcaster
     {
     public:
+        ClientList();
+
         void handlePacket(const juce::String &clientIP, const ClientAnnouncePacket *packet);
 
         void timerCallback() override;
@@ -76,6 +78,8 @@ namespace ananas
                              public juce::Timer
     {
     public:
+        ModuleList();
+
         void handlePacket(const juce::String &moduleIP);
 
         void timerCallback() override;

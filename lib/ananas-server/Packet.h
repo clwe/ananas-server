@@ -12,6 +12,7 @@ namespace ananas
 #pragma pack(push, 1)
         struct Header
         {
+            uint16_t sequenceNumber{0};
             int64_t timestamp;
             uint8_t numChannels;
             uint16_t numFrames;

@@ -8,7 +8,7 @@
 // 1/60 @ 32 frames
 // 1/80 @ 16 frames
 #ifndef PRESENTATION_OFFSET
-#define PRESENTATION_OFFSET 80
+#define PRESENTATION_OFFSET 70
 #endif
 
 #include <AnanasUtils.h>
@@ -96,8 +96,8 @@ namespace ananas::Server
             "Ananas Reboot Sender",
             100,
             "224.4.224.5",
-            49163,
-            49163
+            49164,
+            49164
         };
 
         inline static const Utils::ListenerThreadSocketParams TimestampListenerSocketParams{

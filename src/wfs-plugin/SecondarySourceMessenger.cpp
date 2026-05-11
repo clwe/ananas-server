@@ -7,7 +7,7 @@ namespace ananas::WFS
 {
     SecondarySourceMessenger::SecondarySourceMessenger()
     {
-        if (!socket.bindToPort(49192, ananas::Utils::Strings::LocalInterfaceIP)) {
+        if (!socket.bindToPort(Sockets::SecondarySourceMessengerLocalPort, ananas::Utils::Strings::LocalInterfaceIP)) {
             std::cerr << "Secondary Source Messenger failed to bind to port: " << std::strerror(errno) << std::endl;
         }
     }
@@ -43,8 +43,9 @@ namespace ananas::WFS
                         bundle.addElement(juce::OSCMessage{Params::getSecondarySourcePositionParamID(1, SourcePositionAxis::Y), static_cast<float>(ss1y)});
 
                         disconnect();
-                        if (!connectToSocket(socket, prop.name.toString(), 49192)) {
-                            std::cerr << "Failed to connect to socket using address " << prop.name.toString() << ":49192" << std::endl;
+                        if (!connectToSocket(socket, prop.name.toString(), Sockets::SecondarySourceMessengerRemotePort)) {
+                            std::cerr << "Failed to connect to socket using address " << prop.name.toString() <<
+                                    ":" << Sockets::SecondarySourceMessengerRemotePort << std::endl;
                         }
                         send(bundle);
 

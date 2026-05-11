@@ -102,12 +102,13 @@ namespace ananas
 
     //==========================================================================
 
+    ClientList::ClientList()
+    {
+        startTimer(Server::Constants::ClientConnectednessCheckIntervalMs);
+    }
+
     void ClientList::handlePacket(const juce::String &clientIP, const ClientAnnouncePacket *packet)
     {
-        if (clients.empty()) {
-            startTimer(Server::Constants::ClientConnectednessCheckIntervalMs);
-        }
-
         auto iter{clients.find(clientIP)};
         if (iter == clients.end()) {
             ClientInfo c{};
@@ -210,12 +211,13 @@ namespace ananas
 
     //==========================================================================
 
+    ModuleList::ModuleList()
+    {
+        startTimer(Server::Constants::ClientConnectednessCheckIntervalMs);
+    }
+
     void ModuleList::handlePacket(const juce::String &moduleIP)
     {
-        if (modules.empty()) {
-            startTimer(Server::Constants::ClientConnectednessCheckIntervalMs);
-        }
-
         auto iter{modules.find(moduleIP)};
         if (iter == modules.end()) {
             ModuleInfo m{};
