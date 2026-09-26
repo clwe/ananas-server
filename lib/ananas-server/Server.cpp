@@ -46,7 +46,11 @@ namespace ananas::Server
 
     void Server::prepareToPlay(const int samplesPerBlockExpected, const double sampleRate)
     {
+        // Audio has stopped (at least briefly); the time since the last block
+        // is no longer a reliable indication of that, so re-stamp when it
+        // restarts.
         lastAudioBlockTimeNs = 0;
+        resyncOnNextBlock = true;
         audioSampleRate = sampleRate;
 
         fifo.prepare(std::max(Constants::FifoCapacityFrames, Constants::FifoCapacityBlocks * samplesPerBlockExpected));
@@ -95,8 +99,9 @@ namespace ananas::Server
                 };
                 const auto gapThresholdNs{std::max(Constants::AudioGapThresholdNs, Constants::AudioGapThresholdBlocks * blockDurationNs)};
                 const auto resumedAfterGap{timeSinceLastBlockNs > gapThresholdNs};
+                const auto restarted{resyncOnNextBlock.exchange(false)};
 
-                if (timebaseChanged || resumedAfterGap) {
+                if (timebaseChanged || resumedAfterGap || restarted) {
                     // Packet timestamps are no longer continuous with PTP time,
                     // so re-stamp now rather than waiting for several bad
                     // Follow_Ups. Estimate the current PTP time from the latest
@@ -104,6 +109,8 @@ namespace ananas::Server
                     if (const auto ts{t->getTimestamp()}; ts.receiveTimeNs > 0) {
                         if (resumedAfterGap) {
                             std::cout << "Audio resumed after " << timeSinceLastBlockNs / 1'000'000 << " ms." << std::endl;
+                        } else if (restarted) {
+                            std::cout << "Audio restarted." << std::endl;
                         }
                         s->setPacketTime(ts.ptpTimeNs + (nowNs - ts.receiveTimeNs), true);
                     }

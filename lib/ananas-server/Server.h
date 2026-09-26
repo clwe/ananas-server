@@ -294,6 +294,9 @@ namespace ananas::Server
         uint numChannels;
         // Local time of the previous audio block (audio thread only).
         int64_t lastAudioBlockTimeNs{0};
+        // Re-stamp packets on the next audio block, e.g. after the host
+        // re-prepared audio (such as on a buffer size change).
+        std::atomic<bool> resyncOnNextBlock{false};
         double audioSampleRate{0};
         Fifo fifo;
         SwitchList switches;
