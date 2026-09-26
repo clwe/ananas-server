@@ -15,19 +15,15 @@ namespace ananas
         // (somewhat) accurately.
         nsPerPacket = Server::Constants::NSPS * framesPerPacket / static_cast<int>(sampleRate);
         nsPerPacketRemainder = static_cast<double>(Server::Constants::NSPS) * framesPerPacket / static_cast<int>(sampleRate) - static_cast<double>(nsPerPacket);
-        // Audio packets will be transmitted in bursts according to the number
-        // of frames available in the FIFO. E.g., for a host buffer size of 128
-        // frames, and a framesPerPacket value of 32, four packets will be
-        // transmitted for each host audio callback. Without a small delay
-        // between transmission of consecutive packets, these bursts can be
-        // disruptive to reception of PTP packets, client-side.
-        nsSleepInterval = nsPerPacket * 1 / 100;
-
-        clientBufferDuration = (static_cast<double>(nsPerPacket) + nsPerPacketRemainder) * Server::Constants::ClientPacketBufferSize;
+        clientBufferDuration = getDurationNs() * Server::Constants::ClientPacketBufferSize;
 
         std::cout << framesPerPacket << "/" << sampleRate << " = " <<
-                nsPerPacket << " + " << nsPerPacketRemainder << " ns per block. " <<
-                "Inter-packet sleep interval " << nsSleepInterval << " ns." << std::endl;
+                nsPerPacket << " + " << nsPerPacketRemainder << " ns per packet." << std::endl;
+    }
+
+    double AudioPacket::getDurationNs() const
+    {
+        return static_cast<double>(nsPerPacket) + nsPerPacketRemainder;
     }
 
     uint8_t *AudioPacket::getAudioData()
@@ -93,8 +89,4 @@ namespace ananas
         return currentTimestamp.load();
     }
 
-    long AudioPacket::getSleepInterval() const
-    {
-        return nsSleepInterval;
-    }
 }

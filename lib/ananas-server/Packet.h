@@ -40,7 +40,10 @@ namespace ananas
 
         [[nodiscard]] int64_t getTime() const;
 
-        [[nodiscard]] long getSleepInterval() const;
+        /**
+         * Duration of the audio in one packet.
+         */
+        [[nodiscard]] double getDurationNs() const;
 
     private:
         static constexpr int64_t NoPendingTimestamp{std::numeric_limits<int64_t>::min()};
@@ -52,7 +55,6 @@ namespace ananas
         std::atomic<int64_t> currentTimestamp{0};
         uint consecutiveBadTimestampCount{0};
         int64_t nsPerPacket{};
-        long nsSleepInterval{};
         double nsPerPacketRemainder{};
         double timestampRemainder{0};
         double clientBufferDuration{};

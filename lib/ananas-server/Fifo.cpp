@@ -22,6 +22,11 @@ namespace ananas
         return fifo.getNumReady() >= framesRequested;
     }
 
+    int Fifo::getNumReady() const
+    {
+        return fifo.getNumReady();
+    }
+
     int64_t Fifo::getNumDroppedFrames() const
     {
         return numDroppedFrames.load();

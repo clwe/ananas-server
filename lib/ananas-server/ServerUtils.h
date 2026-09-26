@@ -44,8 +44,10 @@ namespace ananas::Server
         constexpr static size_t ClientPacketBufferSize{50};
 
         /**
-         * Minimum capacity, in frames, of the server's FIFO buffer. The FIFO
-         * is also sized to hold at least FifoCapacityBlocks host blocks.
+         * Minimum capacity, in frames, of the server's FIFO buffer. As packets
+         * are paced at the audio rate, a host block may still be waiting to be
+         * sent when the next arrives, so the FIFO is also sized to hold at
+         * least FifoCapacityBlocks host blocks.
          */
         constexpr static int FifoCapacityFrames{(1 << 12)};
         constexpr static int FifoCapacityBlocks{4};
@@ -93,6 +95,14 @@ namespace ananas::Server
          */
         constexpr static int64_t AudioGapThresholdNs{50'000'000};
         constexpr static int AudioGapThresholdBlocks{4};
+
+        /**
+         * Packets are sent evenly spaced at the audio rate. While more than one
+         * host block is waiting to be sent (e.g. the host's audio clock runs
+         * slightly fast relative to this machine's), the spacing is shortened
+         * by this factor to catch up without sending a burst.
+         */
+        constexpr static double PacketCatchUpIntervalFactor{.5};
 
         constexpr static int ClientConnectednessCheckIntervalMs{1000};
 

@@ -41,6 +41,11 @@ namespace ananas
         [[nodiscard]] bool isReady(int framesRequested) const;
 
         /**
+         * Number of frames waiting to be read.
+         */
+        [[nodiscard]] int getNumReady() const;
+
+        /**
          * Total number of frames discarded because the FIFO was full.
          */
         [[nodiscard]] int64_t getNumDroppedFrames() const;

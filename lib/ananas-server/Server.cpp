@@ -3,6 +3,7 @@
 #include <AnanasUtils.h>
 #include <AuthorityInfo.h>
 #include <chrono>
+#include <thread>
 #include <cstring>
 
 namespace ananas::Server
@@ -274,8 +275,15 @@ namespace ananas::Server
     {
         std::cout << getThreadName() << " sending audio packets..." << std::endl << std::flush;
 
+        // Send packets evenly spaced at the audio rate, rather than each host
+        // block as a burst. Clients drain their Ethernet receive ring (only a
+        // few frames deep) from their main loop, which gets little time while
+        // their DSP runs; a burst of packets overflows it and packets are lost,
+        // e.g. 16 packets per host block at 256 frames.
+        const auto packetDurationNs{packet.getDurationNs()};
+        auto nextSendTimeNs{static_cast<double>(getSteadyTimeNs())};
         auto numDroppedFramesReported{fifo.getNumDroppedFrames()};
-        int64_t lastDropReportTimeNs{0};
+        auto lastDropReportTimeNs{0.};
 
         while (!threadShouldExit()) {
             // Read from the fifo into the packet.
@@ -283,18 +291,29 @@ namespace ananas::Server
             if (threadShouldExit()) break;
             // Write the header to the packet.
             packet.writeHeader();
+
+            const auto nowNs{static_cast<double>(getSteadyTimeNs())};
+
+            if (nowNs - nextSendTimeNs > packetDurationNs) {
+                // Behind schedule, e.g. audio arrived late or after a pause;
+                // restart the schedule rather than catching up in a burst.
+                nextSendTimeNs = nowNs;
+            } else if (nowNs < nextSendTimeNs) {
+                std::this_thread::sleep_for(std::chrono::nanoseconds(static_cast<int64_t>(nextSendTimeNs - nowNs)));
+            }
+
             // Write the packet to the socket.
             socket.write(ip, remotePort, packet.getData(), static_cast<int>(packet.getSize()));
 
-            if (const auto nowNs{getSteadyTimeNs()}, dropped{fifo.getNumDroppedFrames()};
-                dropped != numDroppedFramesReported && nowNs - lastDropReportTimeNs > Constants::NSPS) {
+            if (const auto dropped{fifo.getNumDroppedFrames()}; dropped != numDroppedFramesReported &&
+                                                               nowNs - lastDropReportTimeNs > Constants::NSPS) {
                 std::cerr << "Audio FIFO full: " << dropped - numDroppedFramesReported << " frames discarded." << std::endl;
                 numDroppedFramesReported = dropped;
                 lastDropReportTimeNs = nowNs;
             }
 
-            const timespec t{0, packet.getSleepInterval()};
-            nanosleep(&t, nullptr);
+            const auto isBacklogged{fifo.getNumReady() > audioBlockSamples + static_cast<int>(Constants::FramesPerPacket)};
+            nextSendTimeNs += packetDurationNs * (isBacklogged ? Constants::PacketCatchUpIntervalFactor : 1.);
         }
 
         std::cout << getThreadName() << " stopping." << std::endl;
