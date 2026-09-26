@@ -55,65 +55,96 @@ namespace ananas
 
     void SwitchList::handleEdit(const juce::var &data)
     {
-        const auto obj{data.getDynamicObject()};
-        for (const auto &prop: obj->getProperties()) {
-            if (const auto *s = prop.value.getDynamicObject()) {
-                if (s->getProperty(Utils::Identifiers::SwitchShouldRemovePropertyID)) {
-                    std::cout << "Removing " << prop.name.toString() << std::endl;
-                    switches.erase(prop.name);//(index);
-                    sendChangeMessage();
-                    return;
-                }
+        const auto *obj{data.getDynamicObject()};
+        if (obj == nullptr) return;
 
-                if (s->getProperty(Utils::Identifiers::SwitchShouldResetPtpPropertyID)) {
-                    switches.at(prop.name).shouldResetPtp = true;//(index).shouldResetPtp = true;
-                    sendChangeMessage();
-                    return;
-                }
+        // Only broadcast when something actually changed; the change message
+        // round-trips through the value trees and back into this method.
+        bool changed{false};
+        {
+            const juce::ScopedLock sl{lock};
 
-                auto iter{switches.find(prop.name)};//(index)};
-                if (iter == switches.end()) {
-                    SwitchInfo i{};
-                    iter = switches.insert(std::make_pair(prop.name, i)).first;//(index, i)).first;
-                    std::cout << "Adding " << iter->first.toString() << std::endl;
-                }
+            for (const auto &prop: obj->getProperties()) {
+                if (const auto *s = prop.value.getDynamicObject()) {
+                    if (s->getProperty(Utils::Identifiers::SwitchShouldRemovePropertyID)) {
+                        if (switches.erase(prop.name) > 0) {
+                            std::cout << "Removing " << prop.name.toString() << std::endl;
+                            changed = true;
+                        }
+                        continue;
+                    }
 
-                iter->second.ip = s->getProperty(Utils::Identifiers::SwitchIpPropertyID).toString();
-                iter->second.username = s->getProperty(Utils::Identifiers::SwitchUsernamePropertyID).toString();
-                iter->second.password = s->getProperty(Utils::Identifiers::SwitchPasswordPropertyID).toString();
+                    auto iter{switches.find(prop.name)};
+                    if (iter == switches.end()) {
+                        iter = switches.insert(std::make_pair(prop.name, SwitchInfo{})).first;
+                        std::cout << "Adding " << iter->first.toString() << std::endl;
+                        changed = true;
+                    }
+
+                    const auto ip{s->getProperty(Utils::Identifiers::SwitchIpPropertyID).toString()};
+                    const auto username{s->getProperty(Utils::Identifiers::SwitchUsernamePropertyID).toString()};
+                    const auto password{s->getProperty(Utils::Identifiers::SwitchPasswordPropertyID).toString()};
+
+                    if (ip != iter->second.ip || username != iter->second.username || password != iter->second.password) {
+                        iter->second.ip = ip;
+                        iter->second.username = username;
+                        iter->second.password = password;
+                        iter->second.lastError = {};
+                        changed = true;
+                    }
+
+                    // Picked up by the switch inspector thread, which clears it.
+                    if (s->getProperty(Utils::Identifiers::SwitchShouldResetPtpPropertyID)) {
+                        iter->second.shouldResetPtp = true;
+                    }
+                }
             }
         }
+
+        if (changed) sendChangeMessage();
     }
 
     void SwitchList::handleResponse(const juce::Identifier &switchID, const juce::var &response)
     {
-        if (response.isArray()) {
-            // TODO: maybe don't make this dreadful assumption.
-            //  Thing is, the switch returns an empty JSON array on (successful)
-            //  PTP disable/enable.
-            if (response.getArray()->isEmpty()) {
-                switches.at(switchID).shouldResetPtp = false;
-                sendChangeMessage();
-                return;
-            }
+        {
+            const juce::ScopedLock sl{lock};
 
-            const auto switchInfo = response.getArray()->getFirst();
-            auto iter{switches.find(switchID)};
-            if (iter == switches.end()) {
-                SwitchInfo s{};
-                iter = switches.insert(std::make_pair(switchID, s)).first;
-                std::cout << "Found " << iter->first.toString() << std::endl;
+            // The switch may have been removed while the request was in flight.
+            const auto iter{switches.find(switchID)};
+            if (iter == switches.end()) return;
+
+            if (!response.isArray()) {
+                // Probably an error response, e.g. incorrect ip/username/password.
+                // Report it once rather than on every poll.
+                // TODO: Indicate this in the UI.
+                const auto error{response.isVoid() ? juce::String{"no response"} : juce::JSON::toString(response, true)};
+                if (error != iter->second.lastError) {
+                    std::cerr << "Switch " << iter->second.ip << ": " << error << std::endl;
+                    iter->second.lastError = error;
+                }
+
+                // Don't keep retrying a failed PTP reset in the background.
+                if (!iter->second.shouldResetPtp) return;
+                iter->second.shouldResetPtp = false;
+            } else if (response.getArray()->isEmpty()) {
+                // TODO: maybe don't make this dreadful assumption.
+                //  Thing is, the switch returns an empty JSON array on
+                //  (successful) PTP disable/enable.
+                iter->second.lastError = {};
+                iter->second.shouldResetPtp = false;
+            } else {
+                iter->second.lastError = {};
+                const auto switchInfo{response.getArray()->getFirst()};
+                iter->second.update(&switchInfo);
             }
-            iter->second.update(&switchInfo);
-            sendChangeMessage();
-        } else {
-            // TODO: Probably got an error response...
-            //  Indicate this in the UI; probably incorrect ip/username/password
         }
+
+        sendChangeMessage();
     }
 
     juce::var SwitchList::toVar() const
     {
+        const juce::ScopedLock sl{lock};
         const auto object{new juce::DynamicObject()};
 
         for (const auto &[identifier, switchInfo]: switches) {
@@ -125,6 +156,7 @@ namespace ananas
 
     juce::ValueTree SwitchList::toValueTree() const
     {
+        const juce::ScopedLock sl{lock};
         juce::ValueTree tree(Utils::Identifiers::SwitchesParamID);
 
         for (const auto &[identifier, switchInfo]: switches) {
@@ -138,12 +170,20 @@ namespace ananas
 
     void SwitchList::fromValueTree(const juce::ValueTree &tree)
     {
-        switches.clear();
+        {
+            const juce::ScopedLock sl{lock};
 
-        for (int i{0}; i < tree.getNumChildren(); ++i) {
-            auto switchTree{tree.getChild(i)};
-            juce::Identifier identifier{switchTree.getProperty("identifier")};
-            switches[identifier] = SwitchInfo::fromValueTree(switchTree);
+            switches.clear();
+
+            for (int i{0}; i < tree.getNumChildren(); ++i) {
+                auto switchTree{tree.getChild(i)};
+                const auto identifier{switchTree.getProperty("identifier").toString()};
+                if (identifier.isEmpty()) continue;
+                switches[identifier] = SwitchInfo::fromValueTree(switchTree);
+            }
         }
+
+        // Let the UI know about the restored switches.
+        sendChangeMessage();
     }
 }

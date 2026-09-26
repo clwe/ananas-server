@@ -446,7 +446,8 @@ namespace ananas::Server
                         auto password{s->getProperty(Utils::Identifiers::SwitchPasswordPropertyID).toString()};
                         const bool shouldResetPtp{s->getProperty(Utils::Identifiers::SwitchShouldResetPtpPropertyID)};
 
-                        if (ip.isEmpty() || username.isEmpty() || password.isEmpty()) break;
+                        // Skip incomplete entries, e.g. a newly added row.
+                        if (ip.isEmpty() || username.isEmpty() || password.isEmpty()) continue;
 
                         juce::var jsonData{new juce::DynamicObject};
                         juce::var response;

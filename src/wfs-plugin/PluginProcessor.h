@@ -77,6 +77,10 @@ private:
 
     static juce::AudioProcessorValueTreeState::ParameterLayout createParameterLayout();
 
+    static juce::ValueTree getLastChildWithType(const juce::ValueTree &tree, const juce::Identifier &type);
+
+    static void removeChildrenWithType(juce::ValueTree &tree, const juce::Identifier &type);
+
     BusesProperties getBusesProperties(size_t numChannels);
 
     std::unique_ptr<ananas::Server::Server> server;

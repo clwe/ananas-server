@@ -151,6 +151,11 @@ void PluginProcessor::getStateInformation(juce::MemoryBlock &destData)
 {
     auto state{apvts.copyState()};
 
+    // The switch and module lists are managed by the server, not apvts; make
+    // sure the saved state holds exactly one (current) copy of each.
+    removeChildrenWithType(state, ananas::Utils::Identifiers::SwitchesParamID);
+    removeChildrenWithType(state, ananas::Utils::Identifiers::ModulesParamID);
+
     state.addChild(getServer().getSwitches()->toValueTree(), -1, nullptr);
 
     state.addChild(getServer().getModuleList()->toValueTree(), -1, nullptr);
@@ -164,20 +169,44 @@ void PluginProcessor::setStateInformation(const void *data, int size)
     const auto xmlState{getXmlFromBinary(data, size)};
 
     if (xmlState != nullptr) {
-        const auto tree{juce::ValueTree::fromXml(*xmlState)};
+        auto tree{juce::ValueTree::fromXml(*xmlState)};
 
         if (tree.isValid()) {
-            apvts.replaceState(tree);
-
-            const auto switchListTree{tree.getChildWithName(ananas::Utils::Identifiers::SwitchesParamID)};
+            // Older versions saved an extra copy of these lists on every save;
+            // the last one is the most recent.
+            const auto switchListTree{getLastChildWithType(tree, ananas::Utils::Identifiers::SwitchesParamID)};
             if (switchListTree.isValid()) {
                 getServer().getSwitches()->fromValueTree(switchListTree);
             }
 
-            const auto moduleListTree{tree.getChildWithName(ananas::Utils::Identifiers::ModulesParamID)};
+            const auto moduleListTree{getLastChildWithType(tree, ananas::Utils::Identifiers::ModulesParamID)};
             if (moduleListTree.isValid()) {
                 getServer().getModuleList()->fromValueTree(moduleListTree);
             }
+
+            removeChildrenWithType(tree, ananas::Utils::Identifiers::SwitchesParamID);
+            removeChildrenWithType(tree, ananas::Utils::Identifiers::ModulesParamID);
+
+            apvts.replaceState(tree);
+        }
+    }
+}
+
+juce::ValueTree PluginProcessor::getLastChildWithType(const juce::ValueTree &tree, const juce::Identifier &type)
+{
+    for (auto i{tree.getNumChildren() - 1}; i >= 0; --i) {
+        if (tree.getChild(i).hasType(type)) {
+            return tree.getChild(i);
+        }
+    }
+    return {};
+}
+
+void PluginProcessor::removeChildrenWithType(juce::ValueTree &tree, const juce::Identifier &type)
+{
+    for (auto i{tree.getNumChildren() - 1}; i >= 0; --i) {
+        if (tree.getChild(i).hasType(type)) {
+            tree.removeChild(i, nullptr);
         }
     }
 }
