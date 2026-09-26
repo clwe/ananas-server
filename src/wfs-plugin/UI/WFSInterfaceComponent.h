@@ -24,7 +24,9 @@ namespace ananas::WFS::UI
         WFSInterfaceComponent(int numSources,
                               juce::AudioProcessorValueTreeState &apvts,
                               juce::ValueTree &persistentTreeToListenTo,
-                              juce::HashMap<int, std::atomic<float> *> &sourceAmplitudes);
+                              juce::ValueTree &dynamicTreeToListenTo,
+                              juce::HashMap<int, std::atomic<float> *> &sourceAmplitudes,
+                              ModuleComponent::SelectionCallback onModuleSelected);
 
         ~WFSInterfaceComponent() override;
 
@@ -33,6 +35,8 @@ namespace ananas::WFS::UI
         void resized() override;
 
         void updateModuleLists(const juce::var &var);
+
+        void updateArrayLayout(const juce::var &var);
 
         void valueTreePropertyChanged(juce::ValueTree &treeWhosePropertyHasChanged, const juce::Identifier &property) override;
 
@@ -55,7 +59,12 @@ namespace ananas::WFS::UI
         std::unique_ptr<juce::AudioProcessorValueTreeState::SliderAttachment> speakerSpacingAttachment;
         juce::ToggleButton showModuleSelectorsButton;
         std::unique_ptr<juce::AudioProcessorValueTreeState::ButtonAttachment> showModuleSelectorsAttachment;
+        juce::Label arrayWarningLabel;
         juce::ValueTree &persistentTree;
+        juce::ValueTree &dynamicTree;
+        ModuleComponent::SelectionCallback onModuleSelected;
+        // Number of speakers in each module slot.
+        std::vector<int> slotNumSpeakers;
     };
 } // ananas::WFS
 

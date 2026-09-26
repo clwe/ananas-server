@@ -113,6 +113,7 @@ namespace ananas::UI
                 float samplingRate;
                 float percentCPU;
                 juce::String secondarySourceCoordinates;
+                juce::String sourcesSpeakers;
             };
 
             juce::Array<Row> rows;

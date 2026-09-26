@@ -12,52 +12,33 @@ namespace ananas::WFS
         }
     }
 
-    void SecondarySourceMessenger::valueTreePropertyChanged(
-        juce::ValueTree &treeWhosePropertyHasChanged,
-        const juce::Identifier &property
-    )
+    bool SecondarySourceMessenger::sendPositions(const juce::String &moduleIP, const std::vector<juce::Point<float>> &positions)
     {
-        if (property == ananas::Utils::Identifiers::ModulesParamID) {
-            if (auto *obj = treeWhosePropertyHasChanged[property].getDynamicObject()) {
-                for (const auto &prop: obj->getProperties()) {
-                    auto module{obj->getProperty(prop.name)};
-                    auto hasChanged{module.getProperty(ananas::Utils::Identifiers::ModulePositionHasChangedPropertyID, false)};
-                    if (hasChanged) {
-                        const auto ss0x{module.getProperty(ananas::Utils::Identifiers::ModuleSecondarySource0xPropertyID, 0.f)};
-                        const auto ss0y{module.getProperty(ananas::Utils::Identifiers::ModuleSecondarySource0yPropertyID, 0.f)};
-                        const auto ss1x{module.getProperty(ananas::Utils::Identifiers::ModuleSecondarySource1xPropertyID, 0.f)};
-                        const auto ss1y{module.getProperty(ananas::Utils::Identifiers::ModuleSecondarySource1yPropertyID, 0.f)};
+        // For 16 speakers this is about 780 bytes; module firmware from before
+        // the receive buffer fix (rxBuffer[128]) crashes on bundles this size.
+        juce::OSCBundle bundle;
 
-                        juce::OSCBundle bundle;
-                        // DBG("Sending OSC: " << Params::getSecondarySourcePositionParamID(0, SourcePositionAxis::X) <<
-                        //     " " << juce::String{ss0x} << " to " << prop.name.toString());
-                        // DBG("Sending OSC: " << Params::getSecondarySourcePositionParamID(0, SourcePositionAxis::Y) <<
-                        //     " " << juce::String{ss0y} << " to " << prop.name.toString());
-                        // DBG("Sending OSC: " << Params::getSecondarySourcePositionParamID(1, SourcePositionAxis::X) <<
-                        //     " " << juce::String{ss1x} << " to " << prop.name.toString());
-                        // DBG("Sending OSC: " << Params::getSecondarySourcePositionParamID(1, SourcePositionAxis::Y) <<
-                        //     " " << juce::String{ss1y} << " to " << prop.name.toString());
-                        bundle.addElement(juce::OSCMessage{Params::getSecondarySourcePositionParamID(0, SourcePositionAxis::X), static_cast<float>(ss0x)});
-                        bundle.addElement(juce::OSCMessage{Params::getSecondarySourcePositionParamID(0, SourcePositionAxis::Y), static_cast<float>(ss0y)});
-                        bundle.addElement(juce::OSCMessage{Params::getSecondarySourcePositionParamID(1, SourcePositionAxis::X), static_cast<float>(ss1x)});
-                        bundle.addElement(juce::OSCMessage{Params::getSecondarySourcePositionParamID(1, SourcePositionAxis::Y), static_cast<float>(ss1y)});
-
-                        disconnect();
-                        if (!connectToSocket(socket, prop.name.toString(), Sockets::SecondarySourceMessengerRemotePort)) {
-                            std::cerr << "Failed to connect to socket using address " << prop.name.toString() <<
-                                    ":" << Sockets::SecondarySourceMessengerRemotePort << std::endl;
-                        }
-                        send(bundle);
-
-                        if (auto *moduleObj{module.getDynamicObject()}) {
-                            moduleObj->setProperty(ananas::Utils::Identifiers::ModulePositionHasChangedPropertyID, false);
-                            obj->setProperty(prop.name, module);
-                        }
-                    }
-                }
-
-                treeWhosePropertyHasChanged.setProperty(property, juce::var{obj}, nullptr);
-            }
+        for (size_t j{0}; j < positions.size(); ++j) {
+            const auto index{static_cast<uint>(j)};
+            bundle.addElement(juce::OSCMessage{Params::getSecondarySourcePositionParamID(index, SourcePositionAxis::X), positions[j].x});
+            bundle.addElement(juce::OSCMessage{Params::getSecondarySourcePositionParamID(index, SourcePositionAxis::Y), positions[j].y});
         }
+
+        disconnect();
+        if (!connectToSocket(socket, moduleIP, Sockets::SecondarySourceMessengerRemotePort)) {
+            std::cerr << "Failed to connect to socket using address " << moduleIP <<
+                    ":" << Sockets::SecondarySourceMessengerRemotePort << std::endl;
+            return false;
+        }
+
+        if (!send(bundle)) {
+            // E.g. no route to the module; its address must be on the same
+            // subnet as the local interface.
+            std::cerr << "Failed to send speaker positions to " << moduleIP << ": " << std::strerror(errno) << std::endl;
+            return false;
+        }
+
+        std::cout << "Sent " << positions.size() << " speaker positions to " << moduleIP << std::endl;
+        return true;
     }
 }

@@ -3,6 +3,9 @@
 
 #include <AnanasUtils.h>
 #include <juce_core/juce_core.h>
+#include <atomic>
+#include <cstddef>
+#include <limits>
 
 namespace ananas
 {
@@ -25,14 +28,28 @@ namespace ananas
 
         void writeHeader();
 
-        void setTime(timespec ts);
+        /**
+         * Check the packet timestamp against PTP time and re-stamp packets if
+         * they've drifted too far. Called from the audio thread; the new
+         * timestamp is applied by the next writeHeader().
+         * @param ptpTimeNs Current PTP time.
+         * @param force Re-stamp regardless of the difference, e.g. after the
+         * PTP time base changed or audio processing paused.
+         */
+        void setTime(int64_t ptpTimeNs, bool force);
 
         [[nodiscard]] int64_t getTime() const;
 
         [[nodiscard]] long getSleepInterval() const;
 
     private:
+        static constexpr int64_t NoPendingTimestamp{std::numeric_limits<int64_t>::min()};
+
         Header header{};
+        // Set by setTime() (audio thread), applied by writeHeader() (sender thread).
+        std::atomic<int64_t> pendingTimestamp{NoPendingTimestamp};
+        // Timestamp of the most recent packet, for reading from other threads.
+        std::atomic<int64_t> currentTimestamp{0};
         uint consecutiveBadTimestampCount{0};
         int64_t nsPerPacket{};
         long nsSleepInterval{};
@@ -58,8 +75,17 @@ namespace ananas
         float secondarySource0y{0.f};
         float secondarySource1x{0.f};
         float secondarySource1y{0.f};
+        // Appended in later firmware; older firmware sends a shorter packet
+        // without these. 0 = not reported. See Utils::Constants::Legacy*.
+        juce::uint8 numSources{0};
+        juce::uint8 numSpeakers{0};
     };
 #pragma pack(pop)
+
+    static_assert(sizeof(ClientAnnouncePacket) == 52, "ClientAnnouncePacket must match the client firmware's wire format");
+
+    // Size of the announcement sent by firmware that predates numSources/numSpeakers.
+    constexpr size_t LegacyClientAnnouncePacketSize{offsetof(ClientAnnouncePacket, numSources)};
 
     struct AuthorityAnnouncePacket
     {

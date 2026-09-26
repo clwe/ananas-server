@@ -58,6 +58,40 @@ namespace ananas::Server
 
         constexpr static int PTPFollowUpMessageType{0x08};
 
+        /**
+         * A Follow_Up message is 44 bytes; preciseOriginTimestamp occupies
+         * bytes 34 to 43.
+         */
+        constexpr static int PTPFollowUpMinSize{44};
+
+        /**
+         * Seconds beyond this (2^32, i.e. the year 2106) are treated as
+         * invalid; they would also overflow a nanosecond int64.
+         */
+        constexpr static int64_t PTPMaxSeconds{int64_t{1} << 32};
+
+        /**
+         * How far a Follow_Up timestamp may differ from the time predicted by
+         * the previous one (plus the time elapsed locally) and still be
+         * accepted.
+         */
+        constexpr static int64_t PTPTimestampToleranceNs{50'000'000};
+
+        /**
+         * Number of consecutive, mutually consistent Follow_Up timestamps
+         * required to accept a new PTP time base, e.g. after the grandmaster
+         * rebooted.
+         */
+        constexpr static int PTPNewTimebaseCount{3};
+
+        /**
+         * If audio processing pauses for longer than this, or four audio
+         * blocks if that's longer (e.g. the host stopped playback), packet
+         * timestamps are resynchronised as soon as it resumes.
+         */
+        constexpr static int64_t AudioGapThresholdNs{50'000'000};
+        constexpr static int AudioGapThresholdBlocks{4};
+
         constexpr static int ClientConnectednessCheckIntervalMs{1000};
 
         constexpr static int AuthorityConnectednessCheckIntervalMs{1000};

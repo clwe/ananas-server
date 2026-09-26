@@ -65,10 +65,7 @@ namespace ananas::WFS
 
         // Scale the virtual source co-ordinate to soundfield dimensions...
         if (parameterID.endsWith("x")) {
-            const auto numModules{state.getRawParameterValue(Params::NumModules.id)->load()};
-            const auto speakerSpacing{state.getRawParameterValue(Params::SpeakerSpacing.id)->load()};
-            const auto arrayHalfWidth{(numModules - .5f) * speakerSpacing};
-            newValue *= arrayHalfWidth;
+            newValue *= outerSpeakerX.load();
         } else if (newValue < 0.f) { // Ends with "y"
             newValue *= -Constants::MinYMetres;
         } else {
@@ -79,6 +76,11 @@ namespace ananas::WFS
         // timer callback.
         slots[parameterID].value.store(newValue);
         slots[parameterID].changed.store(true);
+    }
+
+    void VirtualSourceMessenger::setOuterSpeakerX(const float x)
+    {
+        outerSpeakerX.store(x);
     }
 
     void VirtualSourceMessenger::timerCallback()

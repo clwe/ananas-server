@@ -40,6 +40,9 @@ namespace ananas::UI
         {
             removeSwitch(switchID);
         };
+
+        // Show any switches that already exist, e.g. restored with the project.
+        update(persistentTree.getProperty(Utils::Identifiers::SwitchesParamID));
     }
 
     SwitchesComponent::~SwitchesComponent()
@@ -99,8 +102,10 @@ namespace ananas::UI
         const auto switchesVar{persistentTree.getProperty(Utils::Identifiers::SwitchesParamID)};
 
         const auto switchesObject{switchesVar.getDynamicObject()};
+        if (switchesObject == nullptr) return;
 
         const auto switchVar = switchesObject->getProperty(switchID);
+        if (!switchVar.isObject()) return;
         switchVar.getDynamicObject()->setProperty(Utils::Identifiers::SwitchShouldRemovePropertyID, true);
         switchesObject->setProperty(switchID, switchVar);
 
@@ -110,16 +115,25 @@ namespace ananas::UI
 
     void SwitchesComponent::resetPtpForSwitch(const juce::Identifier &switchID) const
     {
-        const auto switchesVar{dynamicTree.getProperty(Utils::Identifiers::SwitchesParamID)};
+        // The dynamic tree only holds the switches once the server has
+        // broadcast them, so fall back to the persistent tree.
+        auto *tree{&dynamicTree};
+        if (!tree->getProperty(Utils::Identifiers::SwitchesParamID).isObject()) {
+            tree = &persistentTree;
+        }
+
+        const auto switchesVar{tree->getProperty(Utils::Identifiers::SwitchesParamID)};
 
         const auto switchesObject{switchesVar.getDynamicObject()};
+        if (switchesObject == nullptr) return;
 
         const auto switchVar = switchesObject->getProperty(switchID);
+        if (!switchVar.isObject()) return;
         switchVar.getDynamicObject()->setProperty(Utils::Identifiers::SwitchShouldResetPtpPropertyID, true);
         switchesObject->setProperty(switchID, switchVar);
 
-        dynamicTree.setProperty(Utils::Identifiers::SwitchesParamID, switchesVar, nullptr);
-        dynamicTree.sendPropertyChangeMessage(Utils::Identifiers::SwitchesParamID);
+        tree->setProperty(Utils::Identifiers::SwitchesParamID, switchesVar, nullptr);
+        tree->sendPropertyChangeMessage(Utils::Identifiers::SwitchesParamID);
     }
 
     void SwitchesComponent::updateSwitch(const juce::Identifier &switchID, const int col, const juce::String &content) const

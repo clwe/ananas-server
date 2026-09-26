@@ -15,11 +15,15 @@ PluginProcessor::PluginProcessor()
     server->getModuleList()->addChangeListener(this);
     server->getAuthority()->addChangeListener(this);
     server->getSwitches()->addChangeListener(this);
-    persistentTree.addListener(&secondarySourceMessenger);
+    apvts.addParameterListener(ananas::WFS::Params::NumModules.id, this);
+    apvts.addParameterListener(ananas::WFS::Params::SpeakerSpacing.id, this);
     for (uint n{0}; n < ananas::WFS::Constants::NumSources; ++n) {
         // Set up source amplitudes for visualisation.
         virtualSourceAmplitudes.set(static_cast<int>(n), new std::atomic{0.f});
     }
+
+    updateArrayLayout();
+    startTimer(ananas::WFS::Constants::SpeakerPositionResendIntervalMs / 2);
 }
 
 PluginProcessor::~PluginProcessor()
@@ -28,7 +32,10 @@ PluginProcessor::~PluginProcessor()
     server->getModuleList()->removeChangeListener(this);
     server->getAuthority()->removeChangeListener(this);
     server->getSwitches()->removeChangeListener(this);
-    persistentTree.removeListener(&secondarySourceMessenger);
+    apvts.removeParameterListener(ananas::WFS::Params::NumModules.id, this);
+    apvts.removeParameterListener(ananas::WFS::Params::SpeakerSpacing.id, this);
+    stopTimer();
+    cancelPendingUpdate();
     for (uint n{0}; n < ananas::WFS::Constants::NumSources; ++n) {
         apvts.removeParameterListener(ananas::WFS::Params::getVirtualSourcePositionParamID(n, ananas::WFS::SourcePositionAxis::X), &virtualSourceMessenger);
         apvts.removeParameterListener(ananas::WFS::Params::getVirtualSourcePositionParamID(n, ananas::WFS::SourcePositionAxis::Y), &virtualSourceMessenger);
@@ -151,6 +158,11 @@ void PluginProcessor::getStateInformation(juce::MemoryBlock &destData)
 {
     auto state{apvts.copyState()};
 
+    // The switch and module lists are managed by the server, not apvts; make
+    // sure the saved state holds exactly one (current) copy of each.
+    removeChildrenWithType(state, ananas::Utils::Identifiers::SwitchesParamID);
+    removeChildrenWithType(state, ananas::Utils::Identifiers::ModulesParamID);
+
     state.addChild(getServer().getSwitches()->toValueTree(), -1, nullptr);
 
     state.addChild(getServer().getModuleList()->toValueTree(), -1, nullptr);
@@ -164,20 +176,44 @@ void PluginProcessor::setStateInformation(const void *data, int size)
     const auto xmlState{getXmlFromBinary(data, size)};
 
     if (xmlState != nullptr) {
-        const auto tree{juce::ValueTree::fromXml(*xmlState)};
+        auto tree{juce::ValueTree::fromXml(*xmlState)};
 
         if (tree.isValid()) {
-            apvts.replaceState(tree);
-
-            const auto switchListTree{tree.getChildWithName(ananas::Utils::Identifiers::SwitchesParamID)};
+            // Older versions saved an extra copy of these lists on every save;
+            // the last one is the most recent.
+            const auto switchListTree{getLastChildWithType(tree, ananas::Utils::Identifiers::SwitchesParamID)};
             if (switchListTree.isValid()) {
                 getServer().getSwitches()->fromValueTree(switchListTree);
             }
 
-            const auto moduleListTree{tree.getChildWithName(ananas::Utils::Identifiers::ModulesParamID)};
+            const auto moduleListTree{getLastChildWithType(tree, ananas::Utils::Identifiers::ModulesParamID)};
             if (moduleListTree.isValid()) {
                 getServer().getModuleList()->fromValueTree(moduleListTree);
             }
+
+            removeChildrenWithType(tree, ananas::Utils::Identifiers::SwitchesParamID);
+            removeChildrenWithType(tree, ananas::Utils::Identifiers::ModulesParamID);
+
+            apvts.replaceState(tree);
+        }
+    }
+}
+
+juce::ValueTree PluginProcessor::getLastChildWithType(const juce::ValueTree &tree, const juce::Identifier &type)
+{
+    for (auto i{tree.getNumChildren() - 1}; i >= 0; --i) {
+        if (tree.getChild(i).hasType(type)) {
+            return tree.getChild(i);
+        }
+    }
+    return {};
+}
+
+void PluginProcessor::removeChildrenWithType(juce::ValueTree &tree, const juce::Identifier &type)
+{
+    for (auto i{tree.getNumChildren() - 1}; i >= 0; --i) {
+        if (tree.getChild(i).hasType(type)) {
+            tree.removeChild(i, nullptr);
         }
     }
 }
@@ -190,22 +226,114 @@ void PluginProcessor::changeListenerCallback(juce::ChangeBroadcaster *source)
         persistentTree.setProperty(ananas::Utils::Identifiers::ModulesParamID, modules->toVar(), nullptr);
         persistentTree.sendPropertyChangeMessage(ananas::Utils::Identifiers::ModulesParamID);
 
-        virtualSourceMessenger.parameterChanged(
-            ananas::WFS::Params::SpeakerSpacing.id,
-            apvts.getRawParameterValue(ananas::WFS::Params::SpeakerSpacing.id)->load()
-        );
+        updateArrayLayout();
 
-        for (size_t n{0}; n < ananas::WFS::Constants::NumSources; ++n) {
-            auto idX{ananas::WFS::Params::getVirtualSourcePositionParamID(n, ananas::WFS::SourcePositionAxis::X)},
-                    idY{ananas::WFS::Params::getVirtualSourcePositionParamID(n, ananas::WFS::SourcePositionAxis::Y)};
-            virtualSourceMessenger.parameterChanged(idX, apvts.getRawParameterValue(idX)->load());
-            virtualSourceMessenger.parameterChanged(idY, apvts.getRawParameterValue(idY)->load());
-        }
+        // Newly connected modules need the virtual source positions too.
+        resendVirtualSourcePositions();
     } else if (const auto *authority = dynamic_cast<ananas::AuthorityInfo *>(source)) {
         dynamicTree.setProperty(ananas::Utils::Identifiers::TimeAuthorityParamID, authority->toVar(), nullptr);
     } else if (const auto *switches = dynamic_cast<ananas::SwitchList *>(source)) {
         persistentTree.setProperty(ananas::Utils::Identifiers::SwitchesParamID, switches->toVar(), nullptr);
         dynamicTree.setProperty(ananas::Utils::Identifiers::SwitchesParamID, switches->toVar(), nullptr);
+    }
+}
+
+void PluginProcessor::parameterChanged(const juce::String &parameterID, const float newValue)
+{
+    juce::ignoreUnused(parameterID, newValue);
+
+    // May be called from the audio thread; update the layout on the message thread.
+    triggerAsyncUpdate();
+}
+
+void PluginProcessor::handleAsyncUpdate()
+{
+    if (updateArrayLayout()) {
+        resendVirtualSourcePositions();
+    }
+}
+
+void PluginProcessor::timerCallback()
+{
+    sendSpeakerPositions(true);
+}
+
+void PluginProcessor::assignModuleToSlot(const int slot, const juce::String &moduleIP) const
+{
+    server->getModuleList()->assignSlot(slot, moduleIP);
+}
+
+bool PluginProcessor::updateArrayLayout()
+{
+    const auto numSlots{static_cast<int>(apvts.getRawParameterValue(ananas::WFS::Params::NumModules.id)->load())};
+    const auto speakerSpacing{apvts.getRawParameterValue(ananas::WFS::Params::SpeakerSpacing.id)->load()};
+
+    const auto previousOuterSpeakerX{arrayLayout.outerSpeakerX};
+    arrayLayout = ananas::WFS::ArrayLayout::compute(server->getModuleList()->getEntries(), numSlots, speakerSpacing);
+
+    dynamicTree.setProperty(ananas::WFS::Identifiers::ArrayLayoutParamID, arrayLayout.toVar(), nullptr);
+    virtualSourceMessenger.setOuterSpeakerX(arrayLayout.outerSpeakerX);
+
+    sendSpeakerPositions(false);
+
+    return !juce::approximatelyEqual(arrayLayout.outerSpeakerX, previousOuterSpeakerX);
+}
+
+void PluginProcessor::sendSpeakerPositions(const bool resendUnconfirmed)
+{
+    const auto now{juce::Time::getMillisecondCounter()};
+
+    for (const auto &[ip, info, isConnected]: server->getModuleList()->getEntries()) {
+        if (!isConnected) {
+            // Send again when it reconnects, e.g. after a reboot.
+            sentSpeakerPositions.erase(ip);
+            continue;
+        }
+
+        const auto desired{arrayLayout.modulePositions.find(ip)};
+        if (desired == arrayLayout.modulePositions.end()) continue;
+
+        const auto sent{sentSpeakerPositions.find(ip)};
+        auto shouldSend{sent == sentSpeakerPositions.end() || sent->second.positions != desired->second};
+
+        // Modules don't store positions, and only echo the first two in their
+        // announcements; if those don't match, the module has probably
+        // rebooted (or missed the message), so send them again.
+        if (!shouldSend && resendUnconfirmed &&
+            now - sent->second.timeMs >= ananas::WFS::Constants::SpeakerPositionResendIntervalMs) {
+            shouldSend = !isEchoedByModule(info, desired->second);
+        }
+
+        if (shouldSend) {
+            // Record failed attempts too, so they're retried at the resend
+            // interval rather than on every call.
+            secondarySourceMessenger.sendPositions(ip, desired->second);
+            sentSpeakerPositions[ip] = {desired->second, now};
+        }
+    }
+}
+
+bool PluginProcessor::isEchoedByModule(const ananas::ModuleInfo &info, const std::vector<juce::Point<float>> &positions)
+{
+    const auto matches{
+        [](const std::pair<float, float> &reported, const juce::Point<float> &expected)
+        {
+            return std::abs(reported.first - expected.x) <= ananas::WFS::Constants::SpeakerPositionToleranceMetres &&
+                   std::abs(reported.second - expected.y) <= ananas::WFS::Constants::SpeakerPositionToleranceMetres;
+        }
+    };
+
+    return (positions.empty() || matches(info.reportedSecondarySource0, positions[0])) &&
+           (positions.size() < 2 || matches(info.reportedSecondarySource1, positions[1]));
+}
+
+void PluginProcessor::resendVirtualSourcePositions()
+{
+    for (uint n{0}; n < ananas::WFS::Constants::NumSources; ++n) {
+        auto idX{ananas::WFS::Params::getVirtualSourcePositionParamID(n, ananas::WFS::SourcePositionAxis::X)},
+                idY{ananas::WFS::Params::getVirtualSourcePositionParamID(n, ananas::WFS::SourcePositionAxis::Y)};
+        virtualSourceMessenger.parameterChanged(idX, apvts.getRawParameterValue(idX)->load());
+        virtualSourceMessenger.parameterChanged(idY, apvts.getRawParameterValue(idY)->load());
     }
 }
 

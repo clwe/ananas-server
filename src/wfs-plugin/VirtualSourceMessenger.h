@@ -24,6 +24,12 @@ namespace ananas::WFS
 
         void parameterChanged(const juce::String &parameterID, float newValue) override;
 
+        /**
+         * Set the x-coordinate of the array's rightmost speaker; normalised
+         * virtual source x-coordinates are scaled to it.
+         */
+        void setOuterSpeakerX(float x);
+
         void timerCallback() override;
 
     private:
@@ -40,6 +46,7 @@ namespace ananas::WFS
         juce::uint16 localPort, remotePort;
         bool connected{false};
         std::unordered_map<juce::String, ParamSlot> slots;
+        std::atomic<float> outerSpeakerX{1.f};
         juce::AudioProcessorValueTreeState& state;
 
         JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(VirtualSourceMessenger)

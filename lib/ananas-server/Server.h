@@ -101,7 +101,7 @@ namespace ananas::Server
 
             bool prepare(uint numChannels, int samplesPerBlockExpected, double sampleRate);
 
-            void setPacketTime(timespec ts);
+            void setPacketTime(int64_t ptpTimeNs, bool force);
 
             int64_t getPacketTime() const;
 
@@ -132,7 +132,14 @@ namespace ananas::Server
 
             virtual void handlePacket() = 0;
 
+            /**
+             * Whether to handle only the newest of several queued packets.
+             */
+            virtual bool shouldHandleLatestPacketOnly() const { return false; }
+
             uint8_t buffer[Constants::ListenerBufferSize]{};
+            // Size of the packet currently in buffer.
+            int numBytesRead{0};
             juce::String senderIP{};
             int senderPort{0};
         };
@@ -145,20 +152,55 @@ namespace ananas::Server
         class TimestampListener final : public AnnouncementListenerThread
         {
         public:
+            struct Timestamp
+            {
+                // PTP time from the latest accepted Follow_Up.
+                int64_t ptpTimeNs{0};
+                // Local (steady clock) time at which it was received; 0 if
+                // no timestamp has been accepted yet.
+                int64_t receiveTimeNs{0};
+            };
+
             explicit TimestampListener(const Utils::ListenerThreadSocketParams &p);
 
             bool isNewTimestampAvailable();
 
-            timespec getTimestamp() const noexcept;
+            /**
+             * @return true (once) if the PTP time base has changed since the
+             * last call, e.g. on the first timestamp or after the grandmaster
+             * rebooted.
+             */
+            bool hasTimebaseChanged();
+
+            /**
+             * Safe to call from the audio thread.
+             */
+            Timestamp getTimestamp() const noexcept;
 
         protected:
             void handlePacket() override;
 
+            // Follow_Ups are checked against the local time they arrive, so
+            // a stale, queued one would look wrong.
+            bool shouldHandleLatestPacketOnly() const override { return true; }
+
         private:
             JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(TimestampListener);
 
+            void accept(int64_t ptpTimeNs, int64_t receiveTimeNs, bool isNewTimebase);
+
+            // Listener thread only.
+            Timestamp current{};
+            Timestamp candidate{};
+            int candidateCount{0};
+
+            // Published to other threads; the sequence number (odd while
+            // writing) lets readers get a consistent pair without locking.
+            std::atomic<uint32_t> sequence{0};
+            std::atomic<int64_t> publishedPtpTimeNs{0};
+            std::atomic<int64_t> publishedReceiveTimeNs{0};
             std::atomic<bool> newTimestampAvailable{false};
-            std::atomic<timespec> timestamp{};
+            std::atomic<bool> timebaseChanged{false};
         };
 
         //======================================================================
@@ -250,6 +292,9 @@ namespace ananas::Server
         JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(Server)
 
         uint numChannels;
+        // Local time of the previous audio block (audio thread only).
+        int64_t lastAudioBlockTimeNs{0};
+        double audioSampleRate{0};
         Fifo fifo;
         SwitchList switches;
         ClientList clients;

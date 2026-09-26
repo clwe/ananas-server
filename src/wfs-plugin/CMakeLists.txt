@@ -40,6 +40,7 @@ target_compile_definitions(ananasWFS
 
 target_sources(ananasWFS
         PRIVATE
+        ArrayLayout.cpp
         PluginEditor.cpp
         PluginProcessor.cpp
         SecondarySourceMessenger.cpp

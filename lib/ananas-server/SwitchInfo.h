@@ -22,6 +22,7 @@ namespace ananas
         juce::String username;
         juce::String password;
         bool shouldResetPtp{false};
+        juce::String lastError;
     private:
         juce::var info;
 
@@ -54,6 +55,9 @@ namespace ananas
         void fromValueTree(const juce::ValueTree& tree);
 
     private:
+        // Accessed from the message thread (UI edits, state save/restore) and
+        // the switch inspector thread.
+        mutable juce::CriticalSection lock;
         std::map<juce::Identifier, SwitchInfo> switches;
     };
 }
