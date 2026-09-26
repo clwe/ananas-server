@@ -2,10 +2,21 @@
 #include "Server.h"
 #include <AnanasUtils.h>
 #include <AuthorityInfo.h>
+#include <chrono>
 #include <cstring>
 
 namespace ananas::Server
 {
+    namespace
+    {
+        int64_t getSteadyTimeNs()
+        {
+            return std::chrono::duration_cast<std::chrono::nanoseconds>(
+                std::chrono::steady_clock::now().time_since_epoch()
+            ).count();
+        }
+    }
+
     Server::Server(const uint numChannelsToSend) : numChannels(numChannelsToSend),
                                                    fifo(numChannelsToSend)
     {
@@ -34,6 +45,9 @@ namespace ananas::Server
 
     void Server::prepareToPlay(const int samplesPerBlockExpected, const double sampleRate)
     {
+        lastAudioBlockTimeNs = 0;
+        audioSampleRate = sampleRate;
+
         for (const auto &t: threads) {
             if (auto *s = dynamic_cast<AudioSender *>(t)) {
                 // The audio sender needs to be prepared; other threads do not.
@@ -65,12 +79,35 @@ namespace ananas::Server
     {
         // These checks are kind of overkill, since the order in which threads
         // were added to the OwnedArray is known, but as a santiy check...
+        const auto nowNs{getSteadyTimeNs()};
+        const auto timeSinceLastBlockNs{lastAudioBlockTimeNs > 0 ? nowNs - lastAudioBlockTimeNs : 0};
+        lastAudioBlockTimeNs = nowNs;
+
         if (auto *s = dynamic_cast<AudioSender *>(threads[0])) {
             if (auto *t = dynamic_cast<TimestampListener *>(threads[1])) {
-                // If a new timestamp is available, send it to the audio sender
-                // to see whether the packet timestamp needs to be updated.
-                if (t->isNewTimestampAvailable()) {
-                    s->setPacketTime(t->getTimestamp());
+                const auto timebaseChanged{t->hasTimebaseChanged()};
+                const auto newTimestampAvailable{t->isNewTimestampAvailable()};
+                const auto blockDurationNs{
+                    audioSampleRate > 0 ? static_cast<int64_t>(bufferToFill.numSamples * Constants::NSPS / audioSampleRate) : 0
+                };
+                const auto gapThresholdNs{std::max(Constants::AudioGapThresholdNs, Constants::AudioGapThresholdBlocks * blockDurationNs)};
+                const auto resumedAfterGap{timeSinceLastBlockNs > gapThresholdNs};
+
+                if (timebaseChanged || resumedAfterGap) {
+                    // Packet timestamps are no longer continuous with PTP time,
+                    // so re-stamp now rather than waiting for several bad
+                    // Follow_Ups. Estimate the current PTP time from the latest
+                    // Follow_Up and the time elapsed since it arrived.
+                    if (const auto ts{t->getTimestamp()}; ts.receiveTimeNs > 0) {
+                        if (resumedAfterGap) {
+                            std::cout << "Audio resumed after " << timeSinceLastBlockNs / 1'000'000 << " ms." << std::endl;
+                        }
+                        s->setPacketTime(ts.ptpTimeNs + (nowNs - ts.receiveTimeNs), true);
+                    }
+                } else if (newTimestampAvailable) {
+                    // Send the new timestamp to the audio sender to see whether
+                    // the packet timestamp needs to be updated.
+                    s->setPacketTime(t->getTimestamp().ptpTimeNs, false);
                 }
             }
         }
@@ -215,9 +252,9 @@ namespace ananas::Server
         return startThread();
     }
 
-    void Server::AudioSender::setPacketTime(const timespec ts)
+    void Server::AudioSender::setPacketTime(const int64_t ptpTimeNs, const bool force)
     {
-        packet.setTime(ts);
+        packet.setTime(ptpTimeNs, force);
     }
 
     int64_t Server::AudioSender::getPacketTime() const
@@ -312,9 +349,17 @@ namespace ananas::Server
             if (socket.waitUntilReady(true, timeoutMs)) {
                 if (threadShouldExit()) break;
 
-                if (const auto bytesRead{
-                    socket.read(buffer, Constants::ListenerBufferSize, false, senderIP, senderPort)
-                }; bytesRead > 0) {
+                auto bytesRead{socket.read(buffer, Constants::ListenerBufferSize, false, senderIP, senderPort)};
+
+                // If packets have queued up (e.g. the thread was held up),
+                // optionally skip to the newest one.
+                while (bytesRead > 0 && shouldHandleLatestPacketOnly() && socket.waitUntilReady(true, 0)) {
+                    const auto nextBytesRead{socket.read(buffer, Constants::ListenerBufferSize, false, senderIP, senderPort)};
+                    if (nextBytesRead <= 0) break;
+                    bytesRead = nextBytesRead;
+                }
+
+                if (bytesRead > 0) {
                     numBytesRead = bytesRead;
                     handlePacket();
                 } else if (bytesRead < 0) {
@@ -339,30 +384,110 @@ namespace ananas::Server
         return newTimestampAvailable.exchange(false, std::memory_order_acquire);
     }
 
-    timespec Server::TimestampListener::getTimestamp() const noexcept
+    bool Server::TimestampListener::hasTimebaseChanged()
     {
-        return timestamp.load(std::memory_order_acquire);
+        return timebaseChanged.exchange(false, std::memory_order_acquire);
+    }
+
+    Server::TimestampListener::Timestamp Server::TimestampListener::getTimestamp() const noexcept
+    {
+        Timestamp ts;
+        uint32_t before, after;
+
+        do {
+            before = sequence.load(std::memory_order_acquire);
+            ts.ptpTimeNs = publishedPtpTimeNs.load(std::memory_order_relaxed);
+            ts.receiveTimeNs = publishedReceiveTimeNs.load(std::memory_order_relaxed);
+            std::atomic_thread_fence(std::memory_order_acquire);
+            after = sequence.load(std::memory_order_relaxed);
+        } while (before != after || (before & 1) != 0);
+
+        return ts;
+    }
+
+    void Server::TimestampListener::accept(const int64_t ptpTimeNs, const int64_t receiveTimeNs, const bool isNewTimebase)
+    {
+        current = {ptpTimeNs, receiveTimeNs};
+        candidateCount = 0;
+
+        const auto seq{sequence.load(std::memory_order_relaxed)};
+        sequence.store(seq + 1, std::memory_order_relaxed);
+        std::atomic_thread_fence(std::memory_order_release);
+        publishedPtpTimeNs.store(ptpTimeNs, std::memory_order_relaxed);
+        publishedReceiveTimeNs.store(receiveTimeNs, std::memory_order_relaxed);
+        sequence.store(seq + 2, std::memory_order_release);
+
+        if (isNewTimebase) {
+            timebaseChanged.store(true, std::memory_order_release);
+        }
+        newTimestampAvailable.store(true, std::memory_order_release);
     }
 
     void Server::TimestampListener::handlePacket()
     {
         // Check for Follow_Up message (0x08)
-        if ((buffer[0] & 0x0f) == Constants::PTPFollowUpMessageType) {
-            timespec ts{};
+        if (numBytesRead < Constants::PTPFollowUpMinSize ||
+            (buffer[0] & 0x0f) != Constants::PTPFollowUpMessageType) {
+            return;
+        }
 
-            // Extract seconds (6 bytes)
-            for (int i = 0; i < 6; i++) {
-                ts.tv_sec = ts.tv_sec << 8 | buffer[34 + i];
+        const auto receiveTimeNs{getSteadyTimeNs()};
+        int64_t seconds{0}, nanoseconds{0};
+
+        // Extract seconds (6 bytes)
+        for (int i = 0; i < 6; i++) {
+            seconds = seconds << 8 | buffer[34 + i];
+        }
+
+        // Extract nanoseconds (4 bytes)
+        for (int i = 0; i < 4; i++) {
+            nanoseconds = nanoseconds << 8 | buffer[40 + i];
+        }
+
+        if (seconds >= Constants::PTPMaxSeconds || nanoseconds >= Constants::NSPS) {
+            std::cerr << "Ignoring PTP Follow_Up from " << senderIP << ": invalid timestamp " <<
+                    seconds << " s, " << nanoseconds << " ns." << std::endl;
+            return;
+        }
+
+        const auto ptpTimeNs{seconds * Constants::NSPS + nanoseconds};
+
+        // A Follow_Up should agree with the previous one plus the time that has
+        // elapsed locally since it arrived.
+        const auto predict{
+            [receiveTimeNs](const Timestamp &from) { return from.ptpTimeNs + (receiveTimeNs - from.receiveTimeNs); }
+        };
+        const auto hasTimebase{current.receiveTimeNs != 0};
+        const auto errorNs{hasTimebase ? ptpTimeNs - predict(current) : 0};
+
+        if (hasTimebase && std::abs(errorNs) <= Constants::PTPTimestampToleranceNs) {
+            accept(ptpTimeNs, receiveTimeNs, false);
+            return;
+        }
+
+        // Either a bad timestamp (e.g. a switch relaying garbage, or one that
+        // sat in the socket while this thread was held up), or the master's
+        // time has genuinely changed. Accept a (new) time base once enough
+        // consecutive timestamps agree with one another; two for the first.
+        if (candidateCount > 0 && std::abs(ptpTimeNs - predict(candidate)) <= Constants::PTPTimestampToleranceNs) {
+            ++candidateCount;
+        } else {
+            candidateCount = 1;
+        }
+        candidate = {ptpTimeNs, receiveTimeNs};
+
+        if (candidateCount >= (hasTimebase ? Constants::PTPNewTimebaseCount : 2)) {
+            if (hasTimebase) {
+                std::cout << "PTP time from " << senderIP << " changed by " << static_cast<double>(errorNs) / Constants::NSPS <<
+                        " s; accepting the new time base." << std::endl;
             }
+            accept(ptpTimeNs, receiveTimeNs, true);
+            return;
+        }
 
-            // Extract nanoseconds (4 bytes)
-            for (int i = 0; i < 4; i++) {
-                ts.tv_nsec = ts.tv_nsec << 8 | buffer[40 + i];
-            }
-
-            // Store the new timestamp and indicate that it is available.
-            timestamp.store(ts, std::memory_order_release);
-            newTimestampAvailable.store(true, std::memory_order_release);
+        if (hasTimebase) {
+            std::cerr << "Ignoring PTP Follow_Up from " << senderIP << ": " << static_cast<double>(errorNs) / Constants::NSPS <<
+                    " s away from the expected time." << std::endl;
         }
     }
 

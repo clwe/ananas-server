@@ -3,7 +3,9 @@
 
 #include <AnanasUtils.h>
 #include <juce_core/juce_core.h>
+#include <atomic>
 #include <cstddef>
+#include <limits>
 
 namespace ananas
 {
@@ -26,14 +28,28 @@ namespace ananas
 
         void writeHeader();
 
-        void setTime(timespec ts);
+        /**
+         * Check the packet timestamp against PTP time and re-stamp packets if
+         * they've drifted too far. Called from the audio thread; the new
+         * timestamp is applied by the next writeHeader().
+         * @param ptpTimeNs Current PTP time.
+         * @param force Re-stamp regardless of the difference, e.g. after the
+         * PTP time base changed or audio processing paused.
+         */
+        void setTime(int64_t ptpTimeNs, bool force);
 
         [[nodiscard]] int64_t getTime() const;
 
         [[nodiscard]] long getSleepInterval() const;
 
     private:
+        static constexpr int64_t NoPendingTimestamp{std::numeric_limits<int64_t>::min()};
+
         Header header{};
+        // Set by setTime() (audio thread), applied by writeHeader() (sender thread).
+        std::atomic<int64_t> pendingTimestamp{NoPendingTimestamp};
+        // Timestamp of the most recent packet, for reading from other threads.
+        std::atomic<int64_t> currentTimestamp{0};
         uint consecutiveBadTimestampCount{0};
         int64_t nsPerPacket{};
         long nsSleepInterval{};

@@ -37,6 +37,11 @@ namespace ananas
 
     void AudioPacket::writeHeader()
     {
+        if (const auto pending{pendingTimestamp.exchange(NoPendingTimestamp)}; pending != NoPendingTimestamp) {
+            header.timestamp = pending;
+            timestampRemainder = 0;
+        }
+
         ++header.sequenceNumber;
         header.timestamp += nsPerPacket;
         timestampRemainder += nsPerPacketRemainder;
@@ -44,27 +49,28 @@ namespace ananas
             header.timestamp += 1;
             timestampRemainder -= 1;
         }
+        currentTimestamp.store(header.timestamp);
         copyFrom(&header, 0, sizeof(Header));
     }
 
-    void AudioPacket::setTime(const timespec ts)
+    void AudioPacket::setTime(const int64_t ptpTimeNs, const bool force)
     {
         // Set the time a little ahead; a reproduction offset, and something to
         // compensate for the fact that it took a little while for the follow-up
         // message to arrive.
-        const auto newTime{ts.tv_sec * Server::Constants::NSPS + ts.tv_nsec + Server::Constants::PacketOffsetNs};
+        const auto newTime{ptpTimeNs + Server::Constants::PacketOffsetNs};
+
+        if (force) {
+            std::cout << "Resynchronising packet timestamp to " << newTime << std::endl;
+            pendingTimestamp.store(newTime);
+            consecutiveBadTimestampCount = 0;
+            return;
+        }
 
         // If the difference between the new time and the current packet
         // timestamp exceeds what can possibly be available at the client,
         // update the header timestamp.
-        const auto timestampDiff{static_cast<double>(newTime - header.timestamp)};
-
-        // TODO: make the diff available at server level so it can be displayed in UI
-        std::stringstream ss;
-        ss.imbue(std::locale("en_GB.UTF-8")); // Use system locale
-        ss << std::fixed << std::setprecision(0) << timestampDiff;
-
-        // std::cout << "Audio/PTP timestamp diff " << ss.str() << " ns" << std::endl;
+        const auto timestampDiff{static_cast<double>(newTime - currentTimestamp.load())};
 
         if (timestampDiff > clientBufferDuration / 2 || timestampDiff < -clientBufferDuration / 2) {
             std::cerr << "Timestamp diff is " << std::fixed << timestampDiff << std::endl;
@@ -74,15 +80,17 @@ namespace ananas
             // header.
             if (++consecutiveBadTimestampCount >= 3) {
                 std::cerr << "... Setting packet timestamp to " << newTime << std::endl;
-                header.timestamp = newTime;
+                pendingTimestamp.store(newTime);
                 consecutiveBadTimestampCount = 0;
             }
+        } else {
+            consecutiveBadTimestampCount = 0;
         }
     }
 
     int64_t AudioPacket::getTime() const
     {
-        return header.timestamp;
+        return currentTimestamp.load();
     }
 
     long AudioPacket::getSleepInterval() const
