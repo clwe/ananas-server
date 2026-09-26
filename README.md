@@ -12,8 +12,8 @@ signal processing.
 Ananas exists with the aim of being a lightweight, multicast, _time-sensitive_
 audio system for local area networks.
 
-Currently certain low-level networking operations are Linux-only; support for
-other operating systems may follow in due course.
+Ananas is developed on Linux. It also builds and runs on macOS, with a few
+differences in setup; see [macOS](#macos) below.
 
 ## Dependencies
 
@@ -23,8 +23,8 @@ other operating systems may follow in due course.
 - libcurl (Arch/Manjaro `sudo pacman -Syu curl`, Ubuntu
   `sudo apt-get install libcurl-dev` (or `libcurlpp-dev`))
 
-Additionally, in order for Ananas to read timestamps from PTP follow-up packets
-(on port 320) it may be necessary to change what `sysctl` deems an 
+Additionally, on Linux, in order for Ananas to read timestamps from PTP
+follow-up packets (on port 320) it may be necessary to change what `sysctl` deems an 
 "unprivileged" port.
 
 ```shell
@@ -74,6 +74,48 @@ configured manually, i.e. _without DHCP_ as follows:
 - Gateway: 192.168.10.x
 
 where 'x' is the last octet of the IP address assigned to the switch.
+
+### macOS
+
+Setup on macOS differs from the above as follows.
+
+- **Skip the `sysctl` step.** macOS lets unprivileged processes bind to ports
+  below 1024 as long as they bind to all interfaces, which is what Ananas does
+  for PTP port 320.
+- **Leave the Router field empty.** Configure the ethernet adapter manually
+  (System Settings → Network → _adapter_ → Details → TCP/IP) with address
+  `192.168.10.10` and subnet mask `255.255.255.0`, but leave _Router_ blank.
+  With a router set, the ethernet adapter can take over the default route and
+  cut off internet access over Wi-Fi. Ananas only talks to devices on the
+  `192.168.10.0/24` subnet, so it doesn't need a gateway.
+- **Allow the host through the firewall.** If the macOS firewall is on, it can
+  silently block incoming PTP and announcement packets. Allow the host
+  application (e.g. REAPER) under System Settings → Network → Firewall →
+  Options, or:
+  ```shell
+  sudo /usr/libexec/ApplicationFirewall/socketfilterfw --add /Applications/REAPER.app
+  sudo /usr/libexec/ApplicationFirewall/socketfilterfw --unblockapp /Applications/REAPER.app
+  ```
+- **Select "Teensy Ananas Out" as the audio device, at 48 kHz.** macOS shows
+  the time authority as two audio devices, "Teensy Ananas Out" and "Teensy
+  Ananas In (unused)" (with older firmware, both are called "Teensy Ananas").
+  Only the output device keeps the host's audio clock locked to the
+  authority. With the other one, the host runs at the wrong rate and the
+  clients receive no usable audio.
+- **Use a buffer size of 128 samples or less.** With larger buffers, audio on
+  the clients can be distorted.
+
+To check that PTP packets arrive on the ethernet interface (replace `en11`
+with your adapter; `ifconfig` lists them):
+
+```shell
+sudo tcpdump -i en11 -n -v udp port 320
+```
+
+Follow-up messages should arrive about once a second, with
+`preciseOriginTimeStamp` increasing by one second each time. If the seconds
+jump around randomly, click _Reset PTP_ for the switch in the plugin's
+network tab. This can be needed after the time authority has been rebooted.
 
 ## Deliverables
 
