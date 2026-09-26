@@ -28,11 +28,22 @@ namespace ananas
         explicit Fifo(uint8_t numChannels);
 
         /**
+         * Resize and clear the FIFO, and re-enable reading after abortRead().
+         * Not to be called concurrently with write().
+         */
+        void prepare(int capacityFrames);
+
+        /**
          * Used as a condition_variable predicate.
          * @param framesRequested
          * @return
          */
         [[nodiscard]] bool isReady(int framesRequested) const;
+
+        /**
+         * Total number of frames discarded because the FIFO was full.
+         */
+        [[nodiscard]] int64_t getNumDroppedFrames() const;
 
         /**
          * Write some samples to the FIFO. Called by the audio thread.
@@ -58,6 +69,7 @@ namespace ananas
         std::mutex mutex;
         std::condition_variable condition;
         std::atomic<bool> shouldStop{false};
+        std::atomic<int64_t> numDroppedFrames{0};
     };
 }
 

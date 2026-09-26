@@ -48,6 +48,8 @@ namespace ananas::Server
         lastAudioBlockTimeNs = 0;
         audioSampleRate = sampleRate;
 
+        fifo.prepare(std::max(Constants::FifoCapacityFrames, Constants::FifoCapacityBlocks * samplesPerBlockExpected));
+
         for (const auto &t: threads) {
             if (auto *s = dynamic_cast<AudioSender *>(t)) {
                 // The audio sender needs to be prepared; other threads do not.
@@ -272,6 +274,9 @@ namespace ananas::Server
     {
         std::cout << getThreadName() << " sending audio packets..." << std::endl << std::flush;
 
+        auto numDroppedFramesReported{fifo.getNumDroppedFrames()};
+        int64_t lastDropReportTimeNs{0};
+
         while (!threadShouldExit()) {
             // Read from the fifo into the packet.
             fifo.read(packet.getAudioData(), Constants::FramesPerPacket);
@@ -280,6 +285,13 @@ namespace ananas::Server
             packet.writeHeader();
             // Write the packet to the socket.
             socket.write(ip, remotePort, packet.getData(), static_cast<int>(packet.getSize()));
+
+            if (const auto nowNs{getSteadyTimeNs()}, dropped{fifo.getNumDroppedFrames()};
+                dropped != numDroppedFramesReported && nowNs - lastDropReportTimeNs > Constants::NSPS) {
+                std::cerr << "Audio FIFO full: " << dropped - numDroppedFramesReported << " frames discarded." << std::endl;
+                numDroppedFramesReported = dropped;
+                lastDropReportTimeNs = nowNs;
+            }
 
             const timespec t{0, packet.getSleepInterval()};
             nanosleep(&t, nullptr);

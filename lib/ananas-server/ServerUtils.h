@@ -44,9 +44,11 @@ namespace ananas::Server
         constexpr static size_t ClientPacketBufferSize{50};
 
         /**
-         * Capacity, in frames, of the server's FIFO buffer.
+         * Minimum capacity, in frames, of the server's FIFO buffer. The FIFO
+         * is also sized to hold at least FifoCapacityBlocks host blocks.
          */
-        constexpr static uint16_t FifoCapacityFrames{(1 << 10)};
+        constexpr static int FifoCapacityFrames{(1 << 12)};
+        constexpr static int FifoCapacityBlocks{4};
 
         /**
          * Obsolete... report interval for the FIFO, i.e. how frequently to

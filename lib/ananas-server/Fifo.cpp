@@ -9,9 +9,22 @@ namespace ananas
         startTimer(Server::Constants::FifoReportIntervalMs);
     }
 
+    void Fifo::prepare(const int capacityFrames)
+    {
+        const std::lock_guard lock{mutex};
+        fifo.setTotalSize(capacityFrames);
+        buffer->setSize(buffer->getNumChannels(), capacityFrames, false, true, true);
+        shouldStop = false;
+    }
+
     bool Fifo::isReady(const int framesRequested) const
     {
         return fifo.getNumReady() >= framesRequested;
+    }
+
+    int64_t Fifo::getNumDroppedFrames() const
+    {
+        return numDroppedFrames.load();
     }
 
     void Fifo::write(const juce::AudioBuffer<float> *src)
@@ -26,6 +39,7 @@ namespace ananas
         // the send thread.
         {
             const auto writeHandle{fifo.write(src->getNumSamples())};
+            numDroppedFrames += src->getNumSamples() - (writeHandle.blockSize1 + writeHandle.blockSize2);
 
             for (auto ch{0}; ch < std::min(buffer->getNumChannels(), src->getNumChannels()); ++ch) {
                 const auto readPointer{src->getReadPointer(ch)};
