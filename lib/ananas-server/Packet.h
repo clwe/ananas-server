@@ -3,6 +3,7 @@
 
 #include <AnanasUtils.h>
 #include <juce_core/juce_core.h>
+#include <cstddef>
 
 namespace ananas
 {
@@ -58,8 +59,17 @@ namespace ananas
         float secondarySource0y{0.f};
         float secondarySource1x{0.f};
         float secondarySource1y{0.f};
+        // Appended in later firmware; older firmware sends a shorter packet
+        // without these. 0 = not reported. See Utils::Constants::Legacy*.
+        juce::uint8 numSources{0};
+        juce::uint8 numSpeakers{0};
     };
 #pragma pack(pop)
+
+    static_assert(sizeof(ClientAnnouncePacket) == 52, "ClientAnnouncePacket must match the client firmware's wire format");
+
+    // Size of the announcement sent by firmware that predates numSources/numSpeakers.
+    constexpr size_t LegacyClientAnnouncePacketSize{offsetof(ClientAnnouncePacket, numSources)};
 
     struct AuthorityAnnouncePacket
     {

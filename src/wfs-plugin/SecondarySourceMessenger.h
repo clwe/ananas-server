@@ -1,18 +1,25 @@
 #ifndef SECONDARYSOURCEMESSENGER_H
 #define SECONDARYSOURCEMESSENGER_H
 
-#include <juce_data_structures/juce_data_structures.h>
+#include <juce_graphics/juce_graphics.h>
 #include <juce_osc/juce_osc.h>
 
 namespace ananas::WFS
 {
-    class SecondarySourceMessenger final : public juce::ValueTree::Listener,
-                                           public juce::OSCSender
+    /**
+     * Sends speaker (secondary source) positions, /ss/<j>/x and /ss/<j>/y,
+     * unicast to individual modules.
+     */
+    class SecondarySourceMessenger final : public juce::OSCSender
     {
     public:
         SecondarySourceMessenger();
 
-        void valueTreePropertyChanged(juce::ValueTree &treeWhosePropertyHasChanged, const juce::Identifier &property) override;
+        /**
+         * Send positions for speakers 0 … positions.size() - 1 of one module,
+         * as a single OSC bundle.
+         */
+        bool sendPositions(const juce::String &moduleIP, const std::vector<juce::Point<float>> &positions);
 
     private:
         juce::DatagramSocket socket;

@@ -7,11 +7,15 @@
 
 #include <Server.h>
 #include <juce_audio_processors/juce_audio_processors.h>
+#include "ArrayLayout.h"
 #include "VirtualSourceMessenger.h"
 #include "SecondarySourceMessenger.h"
 
 class PluginProcessor final : public juce::AudioProcessor,
-                              public juce::ChangeListener
+                              public juce::ChangeListener,
+                              public juce::AudioProcessorValueTreeState::Listener,
+                              juce::AsyncUpdater,
+                              juce::Timer
 {
 public:
     PluginProcessor();
@@ -56,6 +60,13 @@ public:
 
     void changeListenerCallback(juce::ChangeBroadcaster *source) override;
 
+    void parameterChanged(const juce::String &parameterID, float newValue) override;
+
+    /**
+     * Put a module in an array slot; an empty IP clears the slot.
+     */
+    void assignModuleToSlot(int slot, const juce::String &moduleIP) const;
+
     juce::AudioProcessorValueTreeState &getParamState();
 
     const juce::AudioProcessorValueTreeState &getParamState() const;
@@ -83,6 +94,28 @@ private:
 
     BusesProperties getBusesProperties(size_t numChannels);
 
+    void handleAsyncUpdate() override;
+
+    void timerCallback() override;
+
+    /**
+     * Recompute speaker positions from the module slots, number of modules
+     * and speaker spacing, and send any that changed.
+     * @return true if the array's width changed.
+     */
+    bool updateArrayLayout();
+
+    /**
+     * Send speaker positions to connected modules that haven't got them yet.
+     * @param resendUnconfirmed Also resend to modules whose announcements
+     * don't echo the positions sent.
+     */
+    void sendSpeakerPositions(bool resendUnconfirmed);
+
+    static bool isEchoedByModule(const ananas::ModuleInfo &info, const std::vector<juce::Point<float>> &positions);
+
+    void resendVirtualSourcePositions();
+
     std::unique_ptr<ananas::Server::Server> server;
 
     // For handling (audio) parameters that are known at compile time.
@@ -97,6 +130,16 @@ private:
     ananas::WFS::VirtualSourceMessenger virtualSourceMessenger;
 
     juce::HashMap<int, std::atomic<float> *> virtualSourceAmplitudes;
+
+    ananas::WFS::ArrayLayout arrayLayout;
+
+    struct SentPositions
+    {
+        std::vector<juce::Point<float>> positions;
+        juce::uint32 timeMs{0};
+    };
+
+    std::map<juce::String, SentPositions> sentSpeakerPositions;
 };
 
 

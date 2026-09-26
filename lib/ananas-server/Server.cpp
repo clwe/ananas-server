@@ -2,6 +2,7 @@
 #include "Server.h"
 #include <AnanasUtils.h>
 #include <AuthorityInfo.h>
+#include <cstring>
 
 namespace ananas::Server
 {
@@ -314,6 +315,7 @@ namespace ananas::Server
                 if (const auto bytesRead{
                     socket.read(buffer, Constants::ListenerBufferSize, false, senderIP, senderPort)
                 }; bytesRead > 0) {
+                    numBytesRead = bytesRead;
                     handlePacket();
                 } else if (bytesRead < 0) {
                     std::cerr << getThreadName() << ": error reading from socket: " << strerror(errno) << std::endl;
@@ -378,8 +380,16 @@ namespace ananas::Server
 
     void Server::ClientListener::handlePacket()
     {
-        clients.handlePacket(senderIP, reinterpret_cast<const ClientAnnouncePacket *>(buffer));
-        modules.handlePacket(senderIP);
+        // Firmware that predates numSources/numSpeakers sends a shorter packet;
+        // copy only what arrived, so the missing fields stay 0 ("not reported")
+        // rather than holding stale bytes from a previous packet.
+        if (numBytesRead < static_cast<int>(LegacyClientAnnouncePacketSize)) return;
+
+        ClientAnnouncePacket packet{};
+        std::memcpy(&packet, buffer, std::min(sizeof(packet), static_cast<size_t>(numBytesRead)));
+
+        clients.handlePacket(senderIP, packet);
+        modules.handlePacket(senderIP, packet);
     }
 
     //==============================================================================

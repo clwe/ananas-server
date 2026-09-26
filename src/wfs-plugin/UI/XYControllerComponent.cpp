@@ -9,11 +9,8 @@ namespace ananas::WFS::UI
         const int numNodesToCreate,
         juce::AudioProcessorValueTreeState &apvts,
         juce::HashMap<int, std::atomic<float> *> &sourceAmplitudes
-    ) : state(apvts),
-        nodeIntensities(sourceAmplitudes)
+    ) : nodeIntensities(sourceAmplitudes)
     {
-        state.addParameterListener(Params::SpeakerSpacing.id, this);
-        state.addParameterListener(Params::NumModules.id, this);
         calculateGridSpacingX();
 
         for (int n{0}; n < numNodesToCreate; ++n) {
@@ -29,11 +26,7 @@ namespace ananas::WFS::UI
         startTimerHz(15);
     }
 
-    XYControllerComponent::~XYControllerComponent()
-    {
-        state.removeParameterListener(Params::SpeakerSpacing.id, this);
-        state.removeParameterListener(Params::NumModules.id, this);
-    }
+    XYControllerComponent::~XYControllerComponent() = default;
 
     void XYControllerComponent::paint(juce::Graphics &g)
     {
@@ -57,25 +50,25 @@ namespace ananas::WFS::UI
         // speakers).
         const auto halfArrayWidth{getSpeakerArrayWidth() / 2};
         const auto halfXYWidth{getWidth() / 2};
-        xGridSpacing = halfXYWidth / halfArrayWidth;
+        xGridSpacing = halfArrayWidth > 0.f ? static_cast<int>(static_cast<float>(halfXYWidth) / halfArrayWidth) : 0;
     }
 
     float XYControllerComponent::getSpeakerArrayWidth() const
     {
-        return state.getRawParameterValue(Params::SpeakerSpacing.id)->load() * 2.f * state.getRawParameterValue(Params::NumModules.id)->load();
+        return speakerArrayWidth;
     }
 
-    void XYControllerComponent::parameterChanged(const juce::String &parameterID, const float newValue)
+    void XYControllerComponent::setArrayGeometry(const float arrayWidthMetres, const int numRenderedSources)
     {
-        juce::ignoreUnused(newValue);
+        speakerArrayWidth = arrayWidthMetres;
+        calculateGridSpacingX();
 
-        if (parameterID == Params::SpeakerSpacing.id || parameterID == Params::NumModules.id) {
-            calculateGridSpacingX();
-            for (const auto &node: nodes) {
-                node->updateTooltip();
-            }
-            repaint();
+        for (const auto &node: nodes) {
+            node->setDimmed(node->getIndex() >= numRenderedSources);
+            node->updateTooltip();
         }
+
+        repaint();
     }
 
     void XYControllerComponent::mouseDown(const juce::MouseEvent &event)
@@ -155,8 +148,11 @@ namespace ananas::WFS::UI
 
     void XYControllerComponent::Node::paint(juce::Graphics &g)
     {
-        if (const auto *lnf{dynamic_cast<WfsLookAndFeel *>(&getLookAndFeel())})
+        if (const auto *lnf{dynamic_cast<WfsLookAndFeel *>(&getLookAndFeel())}) {
+            if (dimmed) g.beginTransparencyLayer(.3f);
             lnf->drawXYControllerNode(g, *this, intensity);
+            if (dimmed) g.endTransparencyLayer();
+        }
     }
 
     void XYControllerComponent::Node::mouseDown(const juce::MouseEvent &event)
@@ -321,17 +317,19 @@ namespace ananas::WFS::UI
     void XYControllerComponent::Node::updateTooltip()
     {
         const XYControllerComponent *xy{dynamic_cast<XYControllerComponent *>(getParentComponent())};
+        if (xy == nullptr) return;
         const auto w{xy->getSpeakerArrayWidth()};
         setTooltip(Utils::normalisedPointToCoordinateMetres(
-            value,
-            juce::Point{
-                -w / 2,
-                static_cast<float>(Constants::MinYMetres)
-            },
-            juce::Point{
-                w / 2,
-                static_cast<float>(Constants::MaxYMetres)
-            }));
+                       value,
+                       juce::Point{
+                           -w / 2,
+                           static_cast<float>(Constants::MinYMetres)
+                       },
+                       juce::Point{
+                           w / 2,
+                           static_cast<float>(Constants::MaxYMetres)
+                       }) +
+                   (dimmed ? juce::String{"\nNot rendered by all modules"} : juce::String{}));
     }
 
     void XYControllerComponent::Node::addListener(Listener *listener)
@@ -354,6 +352,14 @@ namespace ananas::WFS::UI
         // Avoid unnecessary repaints
         if (isVisible() && std::abs(newIntensity - intensity) > 0.01f) {
             intensity = newIntensity;
+            repaint();
+        }
+    }
+
+    void XYControllerComponent::Node::setDimmed(const bool shouldBeDimmed)
+    {
+        if (shouldBeDimmed != dimmed) {
+            dimmed = shouldBeDimmed;
             repaint();
         }
     }
@@ -395,15 +401,7 @@ namespace ananas::WFS::UI
         node.addListener(this);
         attachmentX.sendInitialUpdate();
         attachmentY.sendInitialUpdate();
-        const auto w{state.getRawParameterValue(Params::SpeakerSpacing.id)->load() * 2.f * state.getRawParameterValue(Params::NumModules.id)->load()};
-        node.setTooltip(Utils::normalisedPointToCoordinateMetres(
-            juce::Point{
-                state.getRawParameterValue(Params::getVirtualSourcePositionParamID(sourceIndex, SourcePositionAxis::X))->load(),
-                state.getRawParameterValue(Params::getVirtualSourcePositionParamID(sourceIndex, SourcePositionAxis::Y))->load(),
-            },
-            juce::Point{-w / 2, static_cast<float>(Constants::MinYMetres)},
-            juce::Point{w / 2, static_cast<float>(Constants::MaxYMetres)}
-        ));
+        node.updateTooltip();
     }
 
     XYControllerComponent::ParameterAttachment::~ParameterAttachment()

@@ -13,7 +13,12 @@ PluginEditor::PluginEditor(PluginProcessor &p)
           ananas::WFS::Constants::NumSources,
           getProcessor().getParamState(),
           getProcessor().getPersistentTree(),
-          getProcessor().getSourceAmplitudes()
+          getProcessor().getDynamicTree(),
+          getProcessor().getSourceAmplitudes(),
+          [this](const int slot, const juce::String &moduleIP)
+          {
+              getProcessor().assignModuleToSlot(slot, moduleIP);
+          }
       )
 {
     juce::Desktop::getInstance().setDefaultLookAndFeel(&lookAndFeel);

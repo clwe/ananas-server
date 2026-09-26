@@ -70,10 +70,15 @@ appropriately configured ethernet switch. The ethernet interface should be
 configured manually, i.e. _without DHCP_ as follows:
 
 - Address: 192.168.10.10
-- Subnet mask: 255.255.255.0
+- Subnet mask: 255.255.0.0
 - Gateway: 192.168.10.x
 
 where 'x' is the last octet of the IP address assigned to the switch.
+
+The subnet mask must be `255.255.0.0`: modules give themselves addresses of
+the form `192.168.<mac[4]>.<mac[5]>` within `192.168.0.0/16`. With a narrower
+mask, multicast audio still works, but speaker positions, which are sent to
+each module directly, can't reach modules outside `192.168.10.x`.
 
 ### macOS
 
@@ -84,10 +89,11 @@ Setup on macOS differs from the above as follows.
   for PTP port 320.
 - **Leave the Router field empty.** Configure the ethernet adapter manually
   (System Settings → Network → _adapter_ → Details → TCP/IP) with address
-  `192.168.10.10` and subnet mask `255.255.255.0`, but leave _Router_ blank.
+  `192.168.10.10` and subnet mask `255.255.0.0`, but leave _Router_ blank.
   With a router set, the ethernet adapter can take over the default route and
   cut off internet access over Wi-Fi. Ananas only talks to devices on the
-  `192.168.10.0/24` subnet, so it doesn't need a gateway.
+  `192.168.0.0/16` subnet, so it doesn't need a gateway. (If your Wi-Fi
+  network also uses `192.168.x.x` addresses, the two will clash.)
 - **Allow the host through the firewall.** If the macOS firewall is on, it can
   silently block incoming PTP and announcement packets. Allow the host
   application (e.g. REAPER) under System Settings → Network → Firewall →

@@ -7,7 +7,6 @@
 namespace ananas::WFS::UI
 {
     class XYControllerComponent final : public juce::Component,
-                                        public juce::AudioProcessorValueTreeState::Listener,
                                         public juce::Timer
     {
     public:
@@ -35,7 +34,12 @@ namespace ananas::WFS::UI
 
         float getSpeakerArrayWidth() const;
 
-        void parameterChanged(const juce::String &parameterID, float newValue) override;
+        /**
+         * @param arrayWidthMetres Width of the speaker array, edge to edge.
+         * @param numRenderedSources Sources rendered by every module in the
+         * array; nodes for the others are dimmed.
+         */
+        void setArrayGeometry(float arrayWidthMetres, int numRenderedSources);
 
         void mouseDown(const juce::MouseEvent &event) override;
 
@@ -103,6 +107,8 @@ namespace ananas::WFS::UI
 
             void setIntensity(float newIntensity);
 
+            void setDimmed(bool shouldBeDimmed);
+
             class Listener
             {
             public:
@@ -138,6 +144,7 @@ namespace ananas::WFS::UI
             juce::ListenerList<Listener> listeners;
             std::unique_ptr<ScopedDragNotification> currentDrag;
             float intensity{-100.f};
+            bool dimmed{false};
         };
 
     private:
@@ -184,7 +191,7 @@ namespace ananas::WFS::UI
         juce::OwnedArray<Node> nodes;
         juce::OwnedArray<Attachment> attachments;
         int xGridSpacing{};
-        juce::AudioProcessorValueTreeState &state;
+        float speakerArrayWidth{0.f};
         juce::HashMap<int, std::atomic<float> *> &nodeIntensities;
     };
 } // ananas::WFS

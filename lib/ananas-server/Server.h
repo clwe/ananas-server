@@ -133,6 +133,8 @@ namespace ananas::Server
             virtual void handlePacket() = 0;
 
             uint8_t buffer[Constants::ListenerBufferSize]{};
+            // Size of the packet currently in buffer.
+            int numBytesRead{0};
             juce::String senderIP{};
             int senderPort{0};
         };

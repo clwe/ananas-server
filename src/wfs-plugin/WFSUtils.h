@@ -24,6 +24,14 @@ namespace ananas::WFS
         // TODO: receive min/max y-coordinates from clients?
         constexpr static int MaxYMetres{10};
         constexpr static int MinYMetres{-3};
+        // Range of x-coordinates the module firmware accepts (MAX_X in the
+        // client's faust/wfsParams.lib).
+        constexpr static float MaxXMetres{2.25f};
+
+        // Speaker positions are resent if a module's announcement doesn't
+        // echo what was sent (e.g. after a reboot), at most this often.
+        constexpr static juce::uint32 SpeakerPositionResendIntervalMs{2000};
+        constexpr static float SpeakerPositionToleranceMetres{1e-3f};
 
         constexpr static int WFSMessengerThreadTimeout{1000};
     };
@@ -137,6 +145,13 @@ namespace ananas::WFS
     {
     public:
         inline static const juce::Identifier StaticTreeType{"WfsParameters"};
+
+        inline static const juce::Identifier ArrayLayoutParamID{"ArrayLayout"};
+        inline static const juce::Identifier ArraySlotNumSpeakersPropertyID{"slotNumSpeakers"};
+        inline static const juce::Identifier ArrayWidthPropertyID{"arrayWidth"};
+        inline static const juce::Identifier ArrayOuterSpeakerXPropertyID{"outerSpeakerX"};
+        inline static const juce::Identifier ArrayNumRenderedSourcesPropertyID{"numRenderedSources"};
+        inline static const juce::Identifier ArrayNumLimitingModulesPropertyID{"numLimitingModules"};
     };
 
     class MenuItems

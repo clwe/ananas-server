@@ -5,16 +5,23 @@
 
 namespace ananas::WFS::UI
 {
+    /**
+     * Selects which module sits in one slot of the array.
+     */
     class ModuleComponent final : public juce::Component
     {
     public:
-        ModuleComponent(float ss0x, float ss0y, float ss1x, float ss1y, juce::ValueTree &persistentTree);
+        using SelectionCallback = std::function<void(int slot, const juce::String &moduleIP)>;
+
+        ModuleComponent(int slotIndex, SelectionCallback onModuleSelected);
 
         void resized() override;
 
-        void setAvailableModules(const juce::StringArray &ips);
-
-        void setCoordinatesForModule() const;
+        /**
+         * @param ips Connected modules to choose from.
+         * @param selectedIP The module currently in this slot, if any.
+         */
+        void setAvailableModules(const juce::StringArray &ips, const juce::String &selectedIP);
 
         void shouldShowModuleSelector(bool show);
 
@@ -22,18 +29,16 @@ namespace ananas::WFS::UI
 
         void collapseModuleList();
 
-        void setSecondarySourceCoordinates(float ss0x, float ss0y, float ss1x, float ss1y);
-
     private:
         JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(ModuleComponent)
 
-        void setSelectedModule(const juce::String &ip);
+        static constexpr int NoModuleItemID{1};
+        static constexpr int FirstModuleItemID{2};
 
-        juce::ValueTree &tree;
+        int slot;
+        SelectionCallback onModuleSelected;
         bool showModuleSelector{false};
         juce::ComboBox moduleSelector;
-        std::pair<float, float> secondarySource0Position;
-        std::pair<float, float> secondarySource1Position;
     };
 } // ananas::WFS
 

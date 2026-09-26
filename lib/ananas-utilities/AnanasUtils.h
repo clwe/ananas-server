@@ -43,6 +43,9 @@ namespace ananas
         {
         public:
             constexpr static juce::int32 AuthorityInitialUSBFeedbackAccumulator{48 << 25};
+            // Assumed for modules that don't report their source/speaker counts.
+            constexpr static int LegacyNumSources{16};
+            constexpr static int LegacyNumSpeakers{2};
         };
 
         class Strings
@@ -113,14 +116,13 @@ namespace ananas
             inline const static juce::Identifier ClientSamplingRatePropertyID{"samplingRate"};
             inline const static juce::Identifier ClientPercentCPUPropertyID{"percentCPU"};
             inline const static juce::Identifier ClientSecondarySourceCoordinatesPropertyID{"secondarySourceCoordinates"};
+            inline const static juce::Identifier ClientSourcesSpeakersPropertyID{"sourcesSpeakers"};
 
             inline const static juce::Identifier ModulesParamID{"Modules"};
 
-            inline const static juce::Identifier ModuleSecondarySource0xPropertyID{"ModuleSecondarySource0x"};
-            inline const static juce::Identifier ModuleSecondarySource0yPropertyID{"ModuleSecondarySource0y"};
-            inline const static juce::Identifier ModuleSecondarySource1xPropertyID{"ModuleSecondarySource1x"};
-            inline const static juce::Identifier ModuleSecondarySource1yPropertyID{"ModuleSecondarySource1y"};
-            inline const static juce::Identifier ModulePositionHasChangedPropertyID{"ModulePositionHasChanged"};
+            inline const static juce::Identifier ModuleSlotPropertyID{"ModuleSlot"};
+            inline const static juce::Identifier ModuleNumSourcesPropertyID{"ModuleNumSources"};
+            inline const static juce::Identifier ModuleNumSpeakersPropertyID{"ModuleNumSpeakers"};
             inline const static juce::Identifier ModuleIsConnectedPropertyID{"ModuleIsConnected"};
         };
 

@@ -221,6 +221,7 @@ namespace ananas::UI
         addColumn(TableColumns::ClientTableSamplingRate);
         addColumn(TableColumns::ClientTablePercentCPU);
         addColumn(TableColumns::ClientTableSecondarySourceCoordinates);
+        addColumn(TableColumns::ClientTableSourcesSpeakers);
 
         table.setModel(this);
         table.setOutlineThickness(1);
@@ -248,6 +249,7 @@ namespace ananas::UI
                     row.samplingRate = client->getProperty(Utils::Identifiers::ClientSamplingRatePropertyID);
                     row.percentCPU = client->getProperty(Utils::Identifiers::ClientPercentCPUPropertyID);
                     row.secondarySourceCoordinates = client->getProperty(Utils::Identifiers::ClientSecondarySourceCoordinatesPropertyID);
+                    row.sourcesSpeakers = client->getProperty(Utils::Identifiers::ClientSourcesSpeakersPropertyID).toString();
                 }
 
                 rows.add(row);
@@ -296,7 +298,8 @@ namespace ananas::UI
                 bufferFillPercent,
                 samplingRate,
                 percentCPU,
-                secondarySourceCoordinates
+                secondarySourceCoordinates,
+                sourcesSpeakers
             ] = rows[rowNumber];
             juce::String text;
 
@@ -324,6 +327,9 @@ namespace ananas::UI
                 case 8: text = juce::String{percentCPU, 3};
                     break;
                 case 9: text = secondarySourceCoordinates;
+                    break;
+                case 10: text = sourcesSpeakers;
+                    break;
                 default: break;
             }
 

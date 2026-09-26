@@ -10,7 +10,7 @@ namespace ananas
     class ClientInfo
     {
     public:
-        void update(const ClientAnnouncePacket *packet);
+        void update(const ClientAnnouncePacket &packet);
 
         [[nodiscard]] bool isConnected() const;
 
@@ -24,7 +24,7 @@ namespace ananas
     class ModuleInfo
     {
     public:
-        void update();
+        void update(const ClientAnnouncePacket &packet);
 
         [[nodiscard]] juce::ValueTree toValueTree() const;
 
@@ -34,17 +34,20 @@ namespace ananas
 
         [[nodiscard]] bool justConnected();
 
-        [[nodiscard]] std::pair<float, float> getSecondarySource0Position() const;
-
-        [[nodiscard]] std::pair<float, float> getSecondarySource1Position() const;
-
         static ModuleInfo fromValueTree(const juce::ValueTree &tree);
+
+        // Position of the module in the array; -1 if unassigned.
+        int slot{-1};
+        // Virtual sources this module renders, speaker outputs it drives.
+        int numSources{Utils::Constants::LegacyNumSources};
+        int numSpeakers{Utils::Constants::LegacyNumSpeakers};
+        // Positions of ss/0 and ss/1 as echoed in the module's announcements.
+        std::pair<float, float> reportedSecondarySource0{0.f, 0.f};
+        std::pair<float, float> reportedSecondarySource1{0.f, 0.f};
 
     private:
         juce::uint32 lastReceiveTime{0};
         bool wasConnected{false};
-        std::pair<float, float> secondarySource0Position;
-        std::pair<float, float> secondarySource1Position;
     };
 
     class ClientList final : public juce::Timer,
@@ -53,7 +56,7 @@ namespace ananas
     public:
         ClientList();
 
-        void handlePacket(const juce::String &clientIP, const ClientAnnouncePacket *packet);
+        void handlePacket(const juce::String &clientIP, const ClientAnnouncePacket &packet);
 
         void timerCallback() override;
 
@@ -70,19 +73,36 @@ namespace ananas
     private:
         void checkConnectivity();
 
+        // Accessed from the message thread and the client listener thread.
+        mutable juce::CriticalSection lock;
         std::map<juce::String, ClientInfo> clients;
-        bool shouldReboot{false};
+        std::atomic<bool> shouldReboot{false};
     };
 
     class ModuleList final : public juce::ChangeBroadcaster,
                              public juce::Timer
     {
     public:
+        struct Entry
+        {
+            juce::String ip;
+            ModuleInfo info;
+            bool isConnected;
+        };
+
         ModuleList();
 
-        void handlePacket(const juce::String &moduleIP);
+        void handlePacket(const juce::String &moduleIP, const ClientAnnouncePacket &packet);
 
         void timerCallback() override;
+
+        /**
+         * Put a module in an array slot. Any module already in that slot is
+         * unassigned. An empty IP just clears the slot.
+         */
+        void assignSlot(int slot, const juce::String &moduleIP);
+
+        [[nodiscard]] std::vector<Entry> getEntries() const;
 
         [[nodiscard]] juce::var toVar() const;
 
@@ -93,6 +113,8 @@ namespace ananas
     private:
         void checkConnectivity();
 
+        // Accessed from the message thread and the client listener thread.
+        mutable juce::CriticalSection lock;
         std::map<juce::String, ModuleInfo> modules;
     };
 }
