@@ -252,7 +252,11 @@ namespace ananas::Server
 
         packet.prepare(numChannels, Constants::FramesPerPacket, sampleRate);
 
-        return startThread();
+        // Packets are sent at regular intervals (one per packet duration), so
+        // ask the OS to wake this thread on time; it sleeps in between. Fall
+        // back to a normal thread if that's not permitted.
+        if (isThreadRunning()) return true;
+        return startRealtimeThread(juce::Thread::RealtimeOptions{}.withPeriodMs(packet.getDurationNs() / 1e6)) || startThread();
     }
 
     void Server::AudioSender::setPacketTime(const int64_t ptpTimeNs, const bool force)
