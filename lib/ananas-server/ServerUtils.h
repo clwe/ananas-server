@@ -104,6 +104,13 @@ namespace ananas::Server
          */
         constexpr static double PacketCatchUpIntervalFactor{.5};
 
+        /**
+         * Packet timestamps are compared with PTP time on every audio block;
+         * if they stay further apart than the tolerance for this long (e.g.
+         * because audio stalled, or was lost), packets are re-stamped.
+         */
+        constexpr static int64_t TimestampResyncPersistenceNs{100'000'000};
+
         constexpr static int ClientConnectednessCheckIntervalMs{1000};
 
         constexpr static int AuthorityConnectednessCheckIntervalMs{1000};

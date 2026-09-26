@@ -163,8 +163,6 @@ namespace ananas::Server
 
             explicit TimestampListener(const Utils::ListenerThreadSocketParams &p);
 
-            bool isNewTimestampAvailable();
-
             /**
              * @return true (once) if the PTP time base has changed since the
              * last call, e.g. on the first timestamp or after the grandmaster
@@ -199,7 +197,6 @@ namespace ananas::Server
             std::atomic<uint32_t> sequence{0};
             std::atomic<int64_t> publishedPtpTimeNs{0};
             std::atomic<int64_t> publishedReceiveTimeNs{0};
-            std::atomic<bool> newTimestampAvailable{false};
             std::atomic<bool> timebaseChanged{false};
         };
 

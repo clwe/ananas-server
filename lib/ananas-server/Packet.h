@@ -30,8 +30,9 @@ namespace ananas
 
         /**
          * Check the packet timestamp against PTP time and re-stamp packets if
-         * they've drifted too far. Called from the audio thread; the new
-         * timestamp is applied by the next writeHeader().
+         * they've been too far off for a while. Called from the audio thread,
+         * on every block; the new timestamp is applied by the next
+         * writeHeader().
          * @param ptpTimeNs Current PTP time.
          * @param force Re-stamp regardless of the difference, e.g. after the
          * PTP time base changed or audio processing paused.
@@ -53,7 +54,9 @@ namespace ananas
         std::atomic<int64_t> pendingTimestamp{NoPendingTimestamp};
         // Timestamp of the most recent packet, for reading from other threads.
         std::atomic<int64_t> currentTimestamp{0};
-        uint consecutiveBadTimestampCount{0};
+        // PTP time at which the packet timestamp was first found to be off;
+        // 0 if it isn't (audio thread only).
+        int64_t timestampOffSinceNs{0};
         int64_t nsPerPacket{};
         double nsPerPacketRemainder{};
         double timestampRemainder{0};

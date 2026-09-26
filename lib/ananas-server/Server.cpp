@@ -93,7 +93,6 @@ namespace ananas::Server
         if (auto *s = dynamic_cast<AudioSender *>(threads[0])) {
             if (auto *t = dynamic_cast<TimestampListener *>(threads[1])) {
                 const auto timebaseChanged{t->hasTimebaseChanged()};
-                const auto newTimestampAvailable{t->isNewTimestampAvailable()};
                 const auto blockDurationNs{
                     audioSampleRate > 0 ? static_cast<int64_t>(bufferToFill.numSamples * Constants::NSPS / audioSampleRate) : 0
                 };
@@ -114,10 +113,11 @@ namespace ananas::Server
                         }
                         s->setPacketTime(ts.ptpTimeNs + (nowNs - ts.receiveTimeNs), true);
                     }
-                } else if (newTimestampAvailable) {
-                    // Send the new timestamp to the audio sender to see whether
-                    // the packet timestamp needs to be updated.
-                    s->setPacketTime(t->getTimestamp().ptpTimeNs, false);
+                } else if (const auto ts{t->getTimestamp()}; ts.receiveTimeNs > 0) {
+                    // Check the packet timestamp against the current PTP time,
+                    // estimated from the latest Follow_Up and the time since it
+                    // arrived.
+                    s->setPacketTime(ts.ptpTimeNs + (nowNs - ts.receiveTimeNs), false);
                 }
             }
         }
@@ -421,11 +421,6 @@ namespace ananas::Server
     {
     }
 
-    bool Server::TimestampListener::isNewTimestampAvailable()
-    {
-        return newTimestampAvailable.exchange(false, std::memory_order_acquire);
-    }
-
     bool Server::TimestampListener::hasTimebaseChanged()
     {
         return timebaseChanged.exchange(false, std::memory_order_acquire);
@@ -462,7 +457,6 @@ namespace ananas::Server
         if (isNewTimebase) {
             timebaseChanged.store(true, std::memory_order_release);
         }
-        newTimestampAvailable.store(true, std::memory_order_release);
     }
 
     void Server::TimestampListener::handlePacket()

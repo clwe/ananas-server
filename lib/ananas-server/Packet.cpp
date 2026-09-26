@@ -59,28 +59,26 @@ namespace ananas
         if (force) {
             std::cout << "Resynchronising packet timestamp to " << newTime << std::endl;
             pendingTimestamp.store(newTime);
-            consecutiveBadTimestampCount = 0;
+            timestampOffSinceNs = 0;
             return;
         }
 
         // If the difference between the new time and the current packet
-        // timestamp exceeds what can possibly be available at the client,
-        // update the header timestamp.
+        // timestamp persistently exceeds what can possibly be available at the
+        // client, update the header timestamp. Brief excursions, e.g. host
+        // callback jitter, are absorbed by the packet pacing.
         const auto timestampDiff{static_cast<double>(newTime - currentTimestamp.load())};
 
         if (timestampDiff > clientBufferDuration / 2 || timestampDiff < -clientBufferDuration / 2) {
-            std::cerr << "Timestamp diff is " << std::fixed << timestampDiff << std::endl;
-
-            // Sometimes bad timestamps come in pairs and things subsequently
-            // settle down. Allow a couple of bad timestamps before updating the
-            // header.
-            if (++consecutiveBadTimestampCount >= 3) {
-                std::cerr << "... Setting packet timestamp to " << newTime << std::endl;
+            if (timestampOffSinceNs == 0) {
+                timestampOffSinceNs = ptpTimeNs;
+            } else if (ptpTimeNs - timestampOffSinceNs >= Server::Constants::TimestampResyncPersistenceNs) {
+                std::cerr << "Packet timestamp off by " << timestampDiff / 1e6 << " ms; resynchronising to " << newTime << std::endl;
                 pendingTimestamp.store(newTime);
-                consecutiveBadTimestampCount = 0;
+                timestampOffSinceNs = 0;
             }
         } else {
-            consecutiveBadTimestampCount = 0;
+            timestampOffSinceNs = 0;
         }
     }
 
