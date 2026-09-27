@@ -83,10 +83,10 @@ namespace ananas::WFS::UI
                           bounds.getHeight() - borderThickness),
                       borderThickness);
 
-        // Index
+        // Label
         g.setColour(node.findColour(XYControllerComponent::Node::textColourId));
         g.setFont(getNodeIndexFontSize());
-        g.drawText(juce::String{node.getIndex() + 1},
+        g.drawText(node.getLabel(),
                    node.getLocalBounds(),
                    juce::Justification::centred);
     }

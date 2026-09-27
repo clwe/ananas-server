@@ -20,8 +20,22 @@ namespace ananas::WFS::UI
             node->setBroughtToFrontOnMouseClick(true);
 
             // Add a parameter attachment
-            attachments.add(new Attachment{n, apvts, *node});
+            const auto index{static_cast<uint>(n)};
+            attachments.add(new Attachment{
+                Params::getVirtualSourcePositionParamID(index, SourcePositionAxis::X),
+                Params::getVirtualSourcePositionParamID(index, SourcePositionAxis::Y),
+                apvts, *node
+            });
         }
+
+        // The Ambisonics listening point, shown while Ambisonics modules are
+        // connected.
+        listenerNode = nodes.add(new Node{Node::ListenerIndex});
+        addChildComponent(listenerNode);
+        listenerNode->setBroughtToFrontOnMouseClick(true);
+        listenerNode->setColour(Node::backgroundColourId, juce::Colours::orange.withAlpha(.6f));
+        listenerNode->setColour(Node::borderColourId, juce::Colours::darkorange);
+        attachments.add(new Attachment{Params::ListenerX.id, Params::ListenerY.id, apvts, *listenerNode});
 
         startTimerHz(15);
     }
@@ -78,7 +92,7 @@ namespace ananas::WFS::UI
             juce::PopupMenu m;
             auto hasInvisibleNodes{false};
             for (int n{0}; n < nodes.size(); ++n) {
-                if (!nodes[n]->isVisible()) {
+                if (!nodes[n]->isListener() && !nodes[n]->isVisible()) {
                     if (!hasInvisibleNodes) {
                         m.addSectionHeader(MenuItems::ShowSourceHeader);
                         m.addItem(MenuItems::ShowAllSources.id, MenuItems::ShowAllSources.text);
@@ -94,7 +108,7 @@ namespace ananas::WFS::UI
                 {
                     if (result == MenuItems::ShowAllSourcesMenuID) {
                         for (const auto &node: nodes) {
-                            node->setVisible(true);
+                            if (!node->isListener()) node->setVisible(true);
                         }
                         return;
                     }
@@ -109,10 +123,19 @@ namespace ananas::WFS::UI
         }
     }
 
+    void XYControllerComponent::setListenerVisible(const bool shouldBeVisible)
+    {
+        listenerNode->setVisible(shouldBeVisible);
+        if (shouldBeVisible) {
+            listenerNode->setBounds();
+            listenerNode->toFront(false);
+        }
+    }
+
     void XYControllerComponent::hideAllNodesBesides(const int nodeIdNotToHide)
     {
         for (const auto &node: nodes) {
-            if (node->getIndex() != nodeIdNotToHide) {
+            if (!node->isListener() && node->getIndex() != nodeIdNotToHide) {
                 node->hide();
             }
         }
@@ -146,6 +169,16 @@ namespace ananas::WFS::UI
     {
     }
 
+    bool XYControllerComponent::Node::isListener() const
+    {
+        return index == ListenerIndex;
+    }
+
+    juce::String XYControllerComponent::Node::getLabel() const
+    {
+        return isListener() ? juce::String{"L"} : juce::String{index + 1};
+    }
+
     void XYControllerComponent::Node::paint(juce::Graphics &g)
     {
         if (const auto *lnf{dynamic_cast<WfsLookAndFeel *>(&getLookAndFeel())}) {
@@ -158,6 +191,9 @@ namespace ananas::WFS::UI
     void XYControllerComponent::Node::mouseDown(const juce::MouseEvent &event)
     {
         if (event.mods.isPopupMenu() && event.originalComponent == this) {
+            // Only sources can be hidden.
+            if (isListener()) return;
+
             juce::PopupMenu m;
             m.addItem(MenuItems::HideSource.id, MenuItems::HideSource.text);
             m.addItem(MenuItems::HideOtherSources.id, MenuItems::HideOtherSources.text);
@@ -319,7 +355,8 @@ namespace ananas::WFS::UI
         const XYControllerComponent *xy{dynamic_cast<XYControllerComponent *>(getParentComponent())};
         if (xy == nullptr) return;
         const auto w{xy->getSpeakerArrayWidth()};
-        setTooltip(Utils::normalisedPointToCoordinateMetres(
+        setTooltip((isListener() ? juce::String{"Listener "} : juce::String{}) +
+                   Utils::normalisedPointToCoordinateMetres(
                        value,
                        juce::Point{
                            -w / 2,
@@ -390,13 +427,14 @@ namespace ananas::WFS::UI
     //==========================================================================
 
     XYControllerComponent::ParameterAttachment::ParameterAttachment(
-        const uint sourceIndex,
+        const juce::String &paramIdX,
+        const juce::String &paramIdY,
         const juce::AudioProcessorValueTreeState &state,
         Node &n,
         juce::UndoManager *um
     ) : node(n),
-        attachmentX(*state.getParameter(Params::getVirtualSourcePositionParamID(sourceIndex, SourcePositionAxis::X)), [this](const float f) { setValueX(f); }, um),
-        attachmentY(*state.getParameter(Params::getVirtualSourcePositionParamID(sourceIndex, SourcePositionAxis::Y)), [this](const float f) { setValueY(f); }, um)
+        attachmentX(*state.getParameter(paramIdX), [this](const float f) { setValueX(f); }, um),
+        attachmentY(*state.getParameter(paramIdY), [this](const float f) { setValueY(f); }, um)
     {
         node.addListener(this);
         attachmentX.sendInitialUpdate();
@@ -447,10 +485,11 @@ namespace ananas::WFS::UI
     //==========================================================================
 
     XYControllerComponent::Attachment::Attachment(
-        const int sourceIndex,
+        const juce::String &paramIdX,
+        const juce::String &paramIdY,
         juce::AudioProcessorValueTreeState &state,
         Node &node
-    ) : attachment(std::make_unique<ParameterAttachment>(sourceIndex, state, node, state.undoManager))
+    ) : attachment(std::make_unique<ParameterAttachment>(paramIdX, paramIdY, state, node, state.undoManager))
     {
     }
 }

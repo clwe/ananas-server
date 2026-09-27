@@ -72,6 +72,17 @@ namespace ananas::WFS::UI
             showModuleSelectorsButton
         );
 
+        // Ambisonics input: encode the sources, or pass an Ambisonic signal
+        // through.
+        addChildComponent(ambisonicsInputSelector);
+        ambisonicsInputSelector.addItemList(Params::AmbisonicsInput.choices, 1);
+        ambisonicsInputSelector.setTooltip(Params::AmbisonicsInput.name);
+        ambisonicsInputAttachment = std::make_unique<juce::AudioProcessorValueTreeState::ComboBoxAttachment>(
+            state,
+            Params::AmbisonicsInput.id,
+            ambisonicsInputSelector
+        );
+
         // Shown when the array is limited, e.g. by modules that render fewer
         // sources than the plugin provides.
         addAndMakeVisible(arrayWarningLabel);
@@ -119,6 +130,7 @@ namespace ananas::WFS::UI
         numModulesLabel.setBounds(optionsRow.removeFromRight(200));
 
         showModuleSelectorsButton.setBounds(optionsRow.removeFromLeft(300));
+        ambisonicsInputSelector.setBounds(optionsRow.removeFromLeft(220).reduced(1, 12));
         arrayWarningLabel.setBounds(optionsRow);
 
         bounds = bounds.reduced(10);
@@ -163,6 +175,7 @@ namespace ananas::WFS::UI
     {
         juce::StringArray ips, labels;
         std::map<int, juce::String> slotModules;
+        auto hasAmbisonicsModules{false};
 
         if (auto *obj = var.getDynamicObject()) {
             for (const auto &prop: obj->getProperties()) {
@@ -172,6 +185,7 @@ namespace ananas::WFS::UI
                             module->getProperty(ananas::Utils::Identifiers::ModuleFirmwareTypePropertyID)))};
                         ips.add(prop.name.toString());
                         labels.add(prop.name.toString() + " (" + ananas::Utils::FirmwareTypeToString(type) + ")");
+                        hasAmbisonicsModules |= type == ananas::Utils::FirmwareType::ambisonicsModule;
                     }
                     if (const int slot{module->getProperty(ananas::Utils::Identifiers::ModuleSlotPropertyID)}; slot >= 0) {
                         slotModules[slot] = prop.name.toString();
@@ -179,6 +193,11 @@ namespace ananas::WFS::UI
                 }
             }
         }
+
+        // The listener and the Ambisonics input only matter for Ambisonics
+        // modules.
+        xyController.setListenerVisible(hasAmbisonicsModules);
+        ambisonicsInputSelector.setVisible(hasAmbisonicsModules);
 
         for (int n{0}; n < modules.size(); ++n) {
             const auto iter{slotModules.find(n)};

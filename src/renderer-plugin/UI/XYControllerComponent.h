@@ -41,6 +41,11 @@ namespace ananas::WFS::UI
          */
         void setArrayGeometry(float arrayWidthMetres, int numRenderedSources);
 
+        /**
+         * Show or hide the Ambisonics listening point.
+         */
+        void setListenerVisible(bool shouldBeVisible);
+
         void mouseDown(const juce::MouseEvent &event) override;
 
         void hideAllNodesBesides(int nodeIdNotToHide);
@@ -60,7 +65,16 @@ namespace ananas::WFS::UI
         public:
             class Listener;
 
+            /**
+             * @param idx Source index; ListenerIndex for the listener.
+             */
             explicit Node(int idx);
+
+            static constexpr int ListenerIndex{-1};
+
+            [[nodiscard]] bool isListener() const;
+
+            [[nodiscard]] juce::String getLabel() const;
 
             //======================================================================
 
@@ -151,7 +165,8 @@ namespace ananas::WFS::UI
         class ParameterAttachment final : Node::Listener
         {
         public:
-            ParameterAttachment(uint sourceIndex,
+            ParameterAttachment(const juce::String &paramIdX,
+                                const juce::String &paramIdY,
                                 const juce::AudioProcessorValueTreeState &state,
                                 Node &n,
                                 juce::UndoManager *um = nullptr);
@@ -177,7 +192,8 @@ namespace ananas::WFS::UI
         class Attachment
         {
         public:
-            Attachment(int sourceIndex,
+            Attachment(const juce::String &paramIdX,
+                       const juce::String &paramIdY,
                        juce::AudioProcessorValueTreeState &state,
                        Node &node);
 
@@ -188,7 +204,9 @@ namespace ananas::WFS::UI
 
         JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(XYControllerComponent)
 
+        // The sources, then the listener.
         juce::OwnedArray<Node> nodes;
+        Node *listenerNode{nullptr};
         juce::OwnedArray<Attachment> attachments;
         int xGridSpacing{};
         float speakerArrayWidth{0.f};

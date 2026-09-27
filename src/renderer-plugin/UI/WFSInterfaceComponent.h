@@ -60,6 +60,9 @@ namespace ananas::WFS::UI
         juce::ToggleButton showModuleSelectorsButton;
         std::unique_ptr<juce::AudioProcessorValueTreeState::ButtonAttachment> showModuleSelectorsAttachment;
         juce::Label arrayWarningLabel;
+        // Shown while Ambisonics modules are connected.
+        juce::ComboBox ambisonicsInputSelector;
+        std::unique_ptr<juce::AudioProcessorValueTreeState::ComboBoxAttachment> ambisonicsInputAttachment;
         juce::ValueTree &persistentTree;
         juce::ValueTree &dynamicTree;
         ModuleComponent::SelectionCallback onModuleSelected;
