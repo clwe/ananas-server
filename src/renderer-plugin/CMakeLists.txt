@@ -44,6 +44,9 @@ target_sources(ananasRenderer
         PluginEditor.cpp
         PluginProcessor.cpp
         Renderers/WfsRenderer.cpp
+        Renderers/AmbisonicsRenderer.cpp
+        Renderers/AmbisonicsControlMessenger.cpp
+        Renderers/AmbisonicEncoder.cpp
         SecondarySourceMessenger.cpp
         VirtualSourceMessenger.cpp
         UI/WFSInterfaceComponent.cpp

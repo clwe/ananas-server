@@ -20,6 +20,11 @@ namespace ananas::WFS
     {
     public:
         constexpr static size_t NumSources{NUM_SOURCES};
+
+        // Ambisonics: ACN channel order, SN3D normalisation, no
+        // Condon-Shortley phase.
+        constexpr static int AmbisonicOrder{2};
+        constexpr static size_t NumAmbisonicChannels{(AmbisonicOrder + 1) * (AmbisonicOrder + 1)};
         constexpr static size_t MaxNumModules{16};
         // TODO: receive min/max y-coordinates from clients?
         constexpr static int MaxYMetres{10};
@@ -95,6 +100,59 @@ namespace ananas::WFS
         constexpr static float VirtualSourceDefaultX{.5f};
         constexpr static float VirtualSourceDefaultY{.5f};
         inline static const juce::NormalisableRange<float> VirtualSourcePositionRange{-1.f, 1.f, 1e-6f};
+
+        // The Ambisonics listening point, normalised like the source positions
+        // (see positionXToMetres() and positionYToMetres()). Kept in front of
+        // the array, and at least 0.1 m off the speaker line.
+        inline static const RangedParamFloat ListenerX{
+            "listenerX",
+            "Listener x",
+            {-1.f, 1.f, 1e-6f},
+            {-1., 1., 1e-6},
+            0.f
+        };
+
+        inline static const RangedParamFloat ListenerY{
+            "listenerY",
+            "Listener y",
+            {-1.f, -.034f, 1e-6f},
+            {-1., -.034, 1e-6},
+            -2.f / 3.f
+        };
+
+        struct ChoiceParam : Param
+        {
+            juce::StringArray choices;
+            int defaultIndex{0};
+        };
+
+        inline static const ChoiceParam AmbisonicsInput{
+            "ambisonicsInput",
+            "Ambisonics input",
+            {"Encode sources", "Pass-through (ACN/SN3D)"},
+            0
+        };
+
+        static constexpr int AmbisonicsInputEncode{0};
+        static constexpr int AmbisonicsInputPassThrough{1};
+
+        /**
+         * Convert a normalised x-coordinate (source or listener) to metres; the
+         * x-range spans the array, to its outermost speakers.
+         */
+        static float positionXToMetres(const float x, const float outerSpeakerX)
+        {
+            return x * outerSpeakerX;
+        }
+
+        /**
+         * Convert a normalised y-coordinate (source or listener) to metres;
+         * negative values are in front of the array.
+         */
+        static float positionYToMetres(const float y)
+        {
+            return y < 0.f ? y * -static_cast<float>(Constants::MinYMetres) : y * static_cast<float>(Constants::MaxYMetres);
+        }
 
         static juce::String getVirtualSourcePositionParamID(const uint index, SourcePositionAxis axis)
         {
@@ -200,6 +258,23 @@ namespace ananas::WFS
 
         static constexpr uint16_t SecondarySourceMessengerLocalPort{49163};
         static constexpr uint16_t SecondarySourceMessengerRemotePort{49163};
+
+        inline static const ananas::Utils::SenderThreadSocketParams AmbisonicsStreamSocketParams{
+            "Ananas Ambisonics Sender",
+            100,
+            "224.4.224.7",
+            49153,
+            49153
+        };
+
+        // Listener position and reference radius for Ambisonics modules.
+        inline static const ananas::Utils::SenderThreadSocketParams AmbisonicsControlSocketParams{
+            "Ambisonics Control Messenger",
+            100,
+            "224.4.224.5",
+            49165,
+            49165
+        };
     };
 
     namespace UI

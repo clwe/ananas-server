@@ -2,6 +2,7 @@
 #include "PluginEditor.h"
 #include "WFSUtils.h"
 #include "Renderers/WfsRenderer.h"
+#include "Renderers/AmbisonicsRenderer.h"
 #include <AnanasUtils.h>
 
 PluginProcessor::PluginProcessor()
@@ -11,6 +12,9 @@ PluginProcessor::PluginProcessor()
       persistentTree(ananas::Utils::Identifiers::PersistentTreeType)
 {
     renderers.push_back(std::make_unique<ananas::WFS::WfsRenderer>(apvts));
+    // The pass-through bus follows the source inputs.
+    renderers.push_back(std::make_unique<ananas::Ambisonics::AmbisonicsRenderer>(
+        apvts, static_cast<int>(ananas::WFS::Constants::NumSources)));
 
     // One audio stream per renderer.
     std::vector<ananas::Server::StreamConfig> streamConfigs;
@@ -81,8 +85,8 @@ void PluginProcessor::processBlock(juce::AudioBuffer<float> &buffer, juce::MidiB
         }
     }
 
-    // Store the max dB level for each channel for the current buffer.
-    for (auto ch{0}; ch < buffer.getNumChannels(); ++ch) {
+    // Store the max dB level for each source for the current buffer.
+    for (auto ch{0}; ch < std::min(buffer.getNumChannels(), static_cast<int>(ananas::WFS::Constants::NumSources)); ++ch) {
         virtualSourceAmplitudes[ch]->store(juce::Decibels::gainToDecibels(buffer.getMagnitude(ch, 0, buffer.getNumSamples())));
     }
 }
@@ -400,6 +404,10 @@ juce::AudioProcessor::BusesProperties PluginProcessor::getBusesProperties(const 
         buses.addBus(false, ananas::Utils::Strings::getOutputLabel(i), juce::AudioChannelSet::mono());
     }
 
+    // Already-encoded Ambisonics, for the pass-through mode.
+    buses.addBus(true, "Ambisonics in (ACN/SN3D)",
+                 juce::AudioChannelSet::discreteChannels(static_cast<int>(ananas::WFS::Constants::NumAmbisonicChannels)));
+
     return buses;
 }
 
@@ -420,6 +428,27 @@ juce::AudioProcessorValueTreeState::ParameterLayout PluginProcessor::createParam
         ananas::WFS::Params::SpeakerSpacing.name,
         ananas::WFS::Params::SpeakerSpacing.range,
         ananas::WFS::Params::SpeakerSpacing.defaultValue
+    ));
+
+    params.add(std::make_unique<juce::AudioParameterFloat>(
+        ananas::WFS::Params::ListenerX.id,
+        ananas::WFS::Params::ListenerX.name,
+        ananas::WFS::Params::ListenerX.range,
+        ananas::WFS::Params::ListenerX.defaultValue
+    ));
+
+    params.add(std::make_unique<juce::AudioParameterFloat>(
+        ananas::WFS::Params::ListenerY.id,
+        ananas::WFS::Params::ListenerY.name,
+        ananas::WFS::Params::ListenerY.range,
+        ananas::WFS::Params::ListenerY.defaultValue
+    ));
+
+    params.add(std::make_unique<juce::AudioParameterChoice>(
+        ananas::WFS::Params::AmbisonicsInput.id,
+        ananas::WFS::Params::AmbisonicsInput.name,
+        ananas::WFS::Params::AmbisonicsInput.choices,
+        ananas::WFS::Params::AmbisonicsInput.defaultIndex
     ));
 
     params.add(std::make_unique<juce::AudioParameterBool>(

@@ -6,7 +6,12 @@ target_sources(ananas_tests
         Main.cpp
         ArrayLayoutTests.cpp
         ModuleListTests.cpp
+        AmbisonicEncoderTests.cpp
+        AmbisonicsRendererTests.cpp
         ${CMAKE_SOURCE_DIR}/src/renderer-plugin/ArrayLayout.cpp
+        ${CMAKE_SOURCE_DIR}/src/renderer-plugin/Renderers/AmbisonicEncoder.cpp
+        ${CMAKE_SOURCE_DIR}/src/renderer-plugin/Renderers/AmbisonicsRenderer.cpp
+        ${CMAKE_SOURCE_DIR}/src/renderer-plugin/Renderers/AmbisonicsControlMessenger.cpp
 )
 
 target_include_directories(ananas_tests
@@ -27,6 +32,8 @@ target_link_libraries(ananas_tests
         juce::juce_events
         juce::juce_graphics
         juce::juce_data_structures
+        juce::juce_audio_processors
+        juce::juce_osc
         ananas_server
         PUBLIC
         juce::juce_recommended_config_flags

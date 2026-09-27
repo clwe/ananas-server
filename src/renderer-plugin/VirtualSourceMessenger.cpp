@@ -65,11 +65,9 @@ namespace ananas::WFS
 
         // Scale the virtual source co-ordinate to soundfield dimensions...
         if (parameterID.endsWith("x")) {
-            newValue *= outerSpeakerX.load();
-        } else if (newValue < 0.f) { // Ends with "y"
-            newValue *= -Constants::MinYMetres;
+            newValue = Params::positionXToMetres(newValue, outerSpeakerX.load());
         } else {
-            newValue *= Constants::MaxYMetres;
+            newValue = Params::positionYToMetres(newValue);
         }
 
         // Indicate that a parameter change message should be sent at the next

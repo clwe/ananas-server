@@ -35,6 +35,13 @@ namespace ananas::WFS
         // Speaker positions for every known module. Unassigned modules get
         // (0, 0) for all speakers.
         std::map<juce::String, std::vector<juce::Point<float>>> modulePositions;
+        // Firmware type of each module that's in a slot.
+        std::map<juce::String, ::ananas::Utils::FirmwareType> assignedModuleTypes;
+
+        /**
+         * Positions of the speakers of all assigned modules of one type.
+         */
+        [[nodiscard]] std::vector<juce::Point<float>> getSpeakerPositions(::ananas::Utils::FirmwareType firmwareType) const;
     };
 }
 

@@ -36,6 +36,7 @@ namespace ananas::WFS
             const auto numSpeakers{layout.slotNumSpeakers[s]};
 
             if (const auto *m{slotModules[s]}) {
+                layout.assignedModuleTypes[m->ip] = m->info.firmwareType;
                 auto &positions{layout.modulePositions[m->ip]};
                 for (int j{0}; j < numSpeakers; ++j) {
                     positions[static_cast<size_t>(j)] = {
@@ -58,6 +59,20 @@ namespace ananas::WFS
         }
 
         return layout;
+    }
+
+    std::vector<juce::Point<float>> ArrayLayout::getSpeakerPositions(const ::ananas::Utils::FirmwareType firmwareType) const
+    {
+        std::vector<juce::Point<float>> positions;
+
+        for (const auto &[ip, type]: assignedModuleTypes) {
+            if (type == firmwareType) {
+                const auto &p{modulePositions.at(ip)};
+                positions.insert(positions.end(), p.begin(), p.end());
+            }
+        }
+
+        return positions;
     }
 
     juce::var ArrayLayout::toVar() const
