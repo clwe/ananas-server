@@ -39,6 +39,7 @@ namespace ananas
     void ModuleInfo::update(const ClientAnnouncePacket &packet)
     {
         lastReceiveTime = juce::Time::getMillisecondCounter();
+        firmwareType = packet.firmwareType;
         numSources = getNumSources(packet);
         numSpeakers = getNumSpeakers(packet);
         reportedSecondarySource0 = {packet.secondarySource0x, packet.secondarySource0y};
@@ -49,6 +50,7 @@ namespace ananas
     {
         juce::ValueTree tree{"Module"};
         tree.setProperty(Utils::Identifiers::ModuleSlotPropertyID, slot, nullptr);
+        tree.setProperty(Utils::Identifiers::ModuleFirmwareTypePropertyID, static_cast<int>(firmwareType), nullptr);
         tree.setProperty(Utils::Identifiers::ModuleNumSourcesPropertyID, numSources, nullptr);
         tree.setProperty(Utils::Identifiers::ModuleNumSpeakersPropertyID, numSpeakers, nullptr);
         return tree;
@@ -87,6 +89,8 @@ namespace ananas
         // unassigned.
         ModuleInfo info;
         info.slot = tree.getProperty(Utils::Identifiers::ModuleSlotPropertyID, -1);
+        info.firmwareType = static_cast<Utils::FirmwareType>(static_cast<int>(
+            tree.getProperty(Utils::Identifiers::ModuleFirmwareTypePropertyID, static_cast<int>(Utils::FirmwareType::wfsModule))));
         info.numSources = tree.getProperty(Utils::Identifiers::ModuleNumSourcesPropertyID, Utils::Constants::LegacyNumSources);
         info.numSpeakers = tree.getProperty(Utils::Identifiers::ModuleNumSpeakersPropertyID, Utils::Constants::LegacyNumSpeakers);
         return info;
@@ -160,7 +164,7 @@ namespace ananas
             client->setProperty(Utils::Identifiers::ClientSecondarySourceCoordinatesPropertyID,
                                 "(" + juce::String{secondarySource0x} + ", " + juce::String{secondarySource0y} +
                                 "), (" + juce::String{secondarySource1x} + ", " + juce::String{secondarySource1y} + ")");
-            if (firmwareType == Utils::FirmwareType::wfsModule) {
+            if (firmwareType == Utils::FirmwareType::wfsModule || firmwareType == Utils::FirmwareType::ambisonicsModule) {
                 // Mark assumed (legacy) counts, i.e. those not reported by the firmware.
                 client->setProperty(Utils::Identifiers::ClientSourcesSpeakersPropertyID,
                                     juce::String{getNumSources(packet)} + (numSources > 0 ? "" : "*") + " / " +
@@ -244,10 +248,16 @@ namespace ananas
 
             auto &module{iter->second};
             const auto previousNumSources{module.numSources}, previousNumSpeakers{module.numSpeakers};
+            const auto previousFirmwareType{module.firmwareType};
             module.update(packet);
 
             if (module.justConnected()) {
                 std::cout << "Module " << iter->first << " just connected." << std::endl;
+                changed = true;
+            }
+
+            if (module.firmwareType != previousFirmwareType) {
+                std::cout << "Module " << iter->first << " runs " << Utils::FirmwareTypeToString(module.firmwareType) << " firmware." << std::endl;
                 changed = true;
             }
 
@@ -305,6 +315,7 @@ namespace ananas
         for (const auto &[ip, m]: modules) {
             auto *module{new juce::DynamicObject()};
             module->setProperty(Utils::Identifiers::ModuleSlotPropertyID, m.slot);
+            module->setProperty(Utils::Identifiers::ModuleFirmwareTypePropertyID, static_cast<int>(m.firmwareType));
             module->setProperty(Utils::Identifiers::ModuleNumSourcesPropertyID, m.numSources);
             module->setProperty(Utils::Identifiers::ModuleNumSpeakersPropertyID, m.numSpeakers);
             module->setProperty(Utils::Identifiers::ModuleIsConnectedPropertyID, m.isConnected());

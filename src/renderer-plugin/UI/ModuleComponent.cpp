@@ -13,8 +13,8 @@ namespace ananas::WFS::UI
         moduleSelector.onChange = [this]
         {
             if (onModuleSelected) {
-                const auto noModule{moduleSelector.getSelectedId() == NoModuleItemID};
-                onModuleSelected(slot, noModule ? juce::String{} : moduleSelector.getText());
+                const auto index{moduleSelector.getSelectedId() - FirstModuleItemID};
+                onModuleSelected(slot, juce::isPositiveAndBelow(index, availableIPs.size()) ? availableIPs[index] : juce::String{});
             }
         };
     }
@@ -31,11 +31,12 @@ namespace ananas::WFS::UI
         }
     }
 
-    void ModuleComponent::setAvailableModules(const juce::StringArray &ips, const juce::String &selectedIP)
+    void ModuleComponent::setAvailableModules(const juce::StringArray &ips, const juce::StringArray &labels, const juce::String &selectedIP)
     {
+        availableIPs = ips;
         moduleSelector.clear(juce::dontSendNotification);
         moduleSelector.addItem("-", NoModuleItemID);
-        moduleSelector.addItemList(ips, FirstModuleItemID);
+        moduleSelector.addItemList(labels, FirstModuleItemID);
 
         if (selectedIP.isEmpty()) {
             moduleSelector.setSelectedId(NoModuleItemID, juce::dontSendNotification);

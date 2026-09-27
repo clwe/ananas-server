@@ -28,9 +28,9 @@ namespace ananas::WFS
         // x-coordinate of the rightmost speaker; virtual source x-coordinates
         // are scaled to this.
         float outerSpeakerX{0.f};
-        // Sources rendered by every assigned module.
+        // Sources rendered by every assigned WFS module.
         int numRenderedSources{0};
-        // Assigned modules that render fewer sources than the plugin provides.
+        // Assigned WFS modules that render fewer sources than the plugin provides.
         int numLimitingModules{0};
         // Speaker positions for every known module. Unassigned modules get
         // (0, 0) for all speakers.

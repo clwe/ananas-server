@@ -44,10 +44,14 @@ namespace ananas::WFS
                     };
                 }
 
-                if (m->info.numSources < static_cast<int>(Constants::NumSources)) {
-                    ++layout.numLimitingModules;
+                // Only WFS modules render the sources individually; for an
+                // Ambisonics module, numSources counts Ambisonic channels.
+                if (m->info.firmwareType == ananas::Utils::FirmwareType::wfsModule) {
+                    if (m->info.numSources < static_cast<int>(Constants::NumSources)) {
+                        ++layout.numLimitingModules;
+                    }
+                    layout.numRenderedSources = juce::jmin(layout.numRenderedSources, m->info.numSources);
                 }
-                layout.numRenderedSources = juce::jmin(layout.numRenderedSources, m->info.numSources);
             }
 
             firstSpeakerIndex += numSpeakers;

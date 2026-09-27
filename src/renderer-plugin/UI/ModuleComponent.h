@@ -19,9 +19,10 @@ namespace ananas::WFS::UI
 
         /**
          * @param ips Connected modules to choose from.
+         * @param labels Text shown for each of ips.
          * @param selectedIP The module currently in this slot, if any.
          */
-        void setAvailableModules(const juce::StringArray &ips, const juce::String &selectedIP);
+        void setAvailableModules(const juce::StringArray &ips, const juce::StringArray &labels, const juce::String &selectedIP);
 
         void shouldShowModuleSelector(bool show);
 
@@ -39,6 +40,7 @@ namespace ananas::WFS::UI
         SelectionCallback onModuleSelected;
         bool showModuleSelector{false};
         juce::ComboBox moduleSelector;
+        juce::StringArray availableIPs;
     };
 } // ananas::WFS
 

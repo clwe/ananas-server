@@ -161,14 +161,17 @@ namespace ananas::WFS::UI
 
     void WFSInterfaceComponent::updateModuleLists(const juce::var &var)
     {
-        juce::StringArray ips;
+        juce::StringArray ips, labels;
         std::map<int, juce::String> slotModules;
 
         if (auto *obj = var.getDynamicObject()) {
             for (const auto &prop: obj->getProperties()) {
                 if (const auto *module = prop.value.getDynamicObject()) {
                     if (module->getProperty(ananas::Utils::Identifiers::ModuleIsConnectedPropertyID)) {
+                        const auto type{static_cast<ananas::Utils::FirmwareType>(static_cast<int>(
+                            module->getProperty(ananas::Utils::Identifiers::ModuleFirmwareTypePropertyID)))};
                         ips.add(prop.name.toString());
+                        labels.add(prop.name.toString() + " (" + ananas::Utils::FirmwareTypeToString(type) + ")");
                     }
                     if (const int slot{module->getProperty(ananas::Utils::Identifiers::ModuleSlotPropertyID)}; slot >= 0) {
                         slotModules[slot] = prop.name.toString();
@@ -179,7 +182,7 @@ namespace ananas::WFS::UI
 
         for (int n{0}; n < modules.size(); ++n) {
             const auto iter{slotModules.find(n)};
-            modules[n]->setAvailableModules(ips, iter != slotModules.end() ? iter->second : juce::String{});
+            modules[n]->setAvailableModules(ips, labels, iter != slotModules.end() ? iter->second : juce::String{});
         }
     }
 

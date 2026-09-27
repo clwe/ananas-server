@@ -121,6 +121,7 @@ namespace ananas
             inline const static juce::Identifier ModulesParamID{"Modules"};
 
             inline const static juce::Identifier ModuleSlotPropertyID{"ModuleSlot"};
+            inline const static juce::Identifier ModuleFirmwareTypePropertyID{"ModuleFirmwareType"};
             inline const static juce::Identifier ModuleNumSourcesPropertyID{"ModuleNumSources"};
             inline const static juce::Identifier ModuleNumSpeakersPropertyID{"ModuleNumSpeakers"};
             inline const static juce::Identifier ModuleIsConnectedPropertyID{"ModuleIsConnected"};

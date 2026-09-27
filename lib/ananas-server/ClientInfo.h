@@ -38,7 +38,10 @@ namespace ananas
 
         // Position of the module in the array; -1 if unassigned.
         int slot{-1};
-        // Virtual sources this module renders, speaker outputs it drives.
+        // Which rendering technique the module's firmware implements.
+        Utils::FirmwareType firmwareType{Utils::FirmwareType::wfsModule};
+        // Virtual sources (WFS) or Ambisonic channels (Ambisonics) this module
+        // renders, and speaker outputs it drives.
         int numSources{Utils::Constants::LegacyNumSources};
         int numSpeakers{Utils::Constants::LegacyNumSpeakers};
         // Positions of ss/0 and ss/1 as echoed in the module's announcements.
