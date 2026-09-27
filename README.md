@@ -55,10 +55,10 @@ However, from the commandline, configure with:
 ```shell
 cmake -DCMAKE_BUILD_TYPE=(Debug|Release) -DCMAKE_MAKE_PROGRAM=ninja -G Ninja -B cmake-build-(debug|release)
 ```
-Then build. For instance for the ananasWFS_CLAP target:
+Then build. For instance for the ananasRenderer_CLAP target:
 
 ```shell
-cmake --build cmake-build-(debug|release) --target ananasWFS_CLAP -j 18
+cmake --build cmake-build-(debug|release) --target ananasRenderer_CLAP -j 18
 ```
 In this instance, the build process will automatically install the .clap plugin
 to an appropriate directory (typically `~/.clap/`).

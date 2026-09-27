@@ -2,17 +2,17 @@ set(companyName "Emeraude")
 
 set(companyCode "EMRD")
 
-set(pluginCode Awfs)
+set(pluginCode Arnd)
 
-set(bundleID "org.emeraude.ananas-wfs")
+set(bundleID "org.emeraude.ananas-renderer")
 
 set(juceFormats Standalone)
 
 # Up to 22 sources @ 32 frames
 # Up to 44 sources @ 16 frames
-set(numSources 16)
+set(numSources 8)
 
-juce_add_plugin(ananasWFS
+juce_add_plugin(ananasRenderer
         COMPANY_NAME "${companyName}"
         IS_SYNTH FALSE
         NEEDS_MIDI_INPUT FALSE
@@ -20,16 +20,16 @@ juce_add_plugin(ananasWFS
         PLUGIN_MANUFACTURER_CODE "${companyCode}"
         PLUGIN_CODE ${pluginCode}
         FORMATS ${juceFormats}
-        PRODUCT_NAME "AnanasWFS"
+        PRODUCT_NAME "AnanasRenderer"
 )
 
 clap_juce_extensions_plugin(
-        TARGET ananasWFS
+        TARGET ananasRenderer
         CLAP_ID "${bundleID}"
         CLAP_FEATURES utility
 )
 
-target_compile_definitions(ananasWFS
+target_compile_definitions(ananasRenderer
         PRIVATE
         JUCE_WEB_BROWSER=0
         JUCE_USE_CURL=0
@@ -38,7 +38,7 @@ target_compile_definitions(ananasWFS
         SHOW_NO_NETWORK_OVERLAY=$<BOOL:${SHOW_NO_NETWORK_OVERLAY}>
 )
 
-target_sources(ananasWFS
+target_sources(ananasRenderer
         PRIVATE
         ArrayLayout.cpp
         PluginEditor.cpp
@@ -52,7 +52,7 @@ target_sources(ananasWFS
         UI/WfsLookAndFeel.cpp
 )
 
-target_link_libraries(ananasWFS
+target_link_libraries(ananasRenderer
         PRIVATE
         juce::juce_core
         juce::juce_osc
