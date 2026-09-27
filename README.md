@@ -145,11 +145,33 @@ as with `ananas_console`, transmits two channels of audio data to
 `224.4.224.4:49152`. Provides functionality for monitoring (and basic management
 of) connected switches, the connected time authority, and connected clients.
 
-### ananasWFS
+### ananasRenderer
 
-A CLAP DAW plugin that embeds `ananas_server` transmits sixteen channels of 
-audio data, representing wave field synthesis (WFS) sound sources, and controls 
-a distributed WFS algorithm running on a network of embedded devices. See 
+A CLAP DAW plugin (AnanasRenderer) that embeds `ananas_server` and drives a
+linear loudspeaker array made of modules running either wave field synthesis
+(WFS) or Ambisonics firmware; both kinds can be used at the same time. The
+technique follows what each module announces.
+
+- **Sources:** 8, positioned in the plugin's XY view.
+- **WFS modules** receive the 8 source channels on `224.4.224.4:49152` and the
+  source positions over OSC (`/vs`), and render the sources themselves.
+- **Ambisonics modules** receive a 2nd-order Ambisonic signal (9 channels, ACN,
+  SN3D) on `224.4.224.7:49153`, the listening point and the reference radius
+  (`/listener/x|y`, `/ambi/rmax` on `224.4.224.5:49165`), and decode it for
+  their own speakers. The plugin encodes the sources as seen from the listening
+  point (the orange L node), or passes through 9 already-encoded channels from
+  its "Ambisonics in" bus.
+- **All modules** are assigned to slots in the array, and receive their
+  speaker positions over OSC (`/ss`).
+
+A stream is only sent while modules that play it are connected. See the
 associated repository [ananas-client](https://github.com/hatchjaw/ananas-client).
 
 (Full instructions to follow.)
+
+## Tests
+
+```shell
+cmake --build cmake-build-release --target ananas_tests
+./cmake-build-release/tests/ananas_tests_artefacts/Release/ananas_tests
+```
