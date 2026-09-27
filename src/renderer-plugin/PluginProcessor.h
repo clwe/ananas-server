@@ -8,8 +8,8 @@
 #include <Server.h>
 #include <juce_audio_processors/juce_audio_processors.h>
 #include "ArrayLayout.h"
-#include "VirtualSourceMessenger.h"
 #include "SecondarySourceMessenger.h"
+#include "Renderers/Renderer.h"
 
 class PluginProcessor final : public juce::AudioProcessor,
                               public juce::ChangeListener,
@@ -100,10 +100,10 @@ private:
 
     /**
      * Recompute speaker positions from the module slots, number of modules
-     * and speaker spacing, and send any that changed.
-     * @return true if the array's width changed.
+     * and speaker spacing, and send any that changed. Also activates each
+     * renderer's stream if modules it drives are connected.
      */
-    bool updateArrayLayout();
+    void updateArrayLayout();
 
     /**
      * Send speaker positions to connected modules that haven't got them yet.
@@ -113,8 +113,6 @@ private:
     void sendSpeakerPositions(bool resendUnconfirmed);
 
     static bool isEchoedByModule(const ananas::ModuleInfo &info, const std::vector<juce::Point<float>> &positions);
-
-    void resendVirtualSourcePositions();
 
     std::unique_ptr<ananas::Server::Server> server;
 
@@ -127,7 +125,9 @@ private:
 
     ananas::WFS::SecondarySourceMessenger secondarySourceMessenger;
 
-    ananas::WFS::VirtualSourceMessenger virtualSourceMessenger;
+    // One per audio stream; renderers[i] feeds the server's stream i.
+    std::vector<std::unique_ptr<ananas::Rendering::Renderer>> renderers;
+    std::vector<juce::AudioBuffer<float>> streamBuffers;
 
     juce::HashMap<int, std::atomic<float> *> virtualSourceAmplitudes;
 

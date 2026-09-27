@@ -14,7 +14,7 @@ namespace ananas::WFS
                                public juce::Timer
     {
     public:
-        VirtualSourceMessenger(const Utils::SenderThreadSocketParams &p, juce::AudioProcessorValueTreeState& apvts);
+        VirtualSourceMessenger(const ::ananas::Utils::SenderThreadSocketParams &p, juce::AudioProcessorValueTreeState& apvts);
 
         ~VirtualSourceMessenger();
 

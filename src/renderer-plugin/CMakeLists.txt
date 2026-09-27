@@ -43,6 +43,7 @@ target_sources(ananasRenderer
         ArrayLayout.cpp
         PluginEditor.cpp
         PluginProcessor.cpp
+        Renderers/WfsRenderer.cpp
         SecondarySourceMessenger.cpp
         VirtualSourceMessenger.cpp
         UI/WFSInterfaceComponent.cpp

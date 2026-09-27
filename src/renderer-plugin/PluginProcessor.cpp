@@ -1,16 +1,25 @@
 #include "PluginProcessor.h"
 #include "PluginEditor.h"
 #include "WFSUtils.h"
+#include "Renderers/WfsRenderer.h"
 #include <AnanasUtils.h>
 
 PluginProcessor::PluginProcessor()
     : AudioProcessor(getBusesProperties(ananas::WFS::Constants::NumSources)),
-      server(std::make_unique<ananas::Server::Server>(ananas::WFS::Constants::NumSources)),
       apvts(*this, nullptr, ananas::WFS::Identifiers::StaticTreeType, createParameterLayout()),
       dynamicTree(ananas::Utils::Identifiers::DynamicTreeType),
-      persistentTree(ananas::Utils::Identifiers::PersistentTreeType),
-      virtualSourceMessenger(ananas::WFS::Sockets::VirtualSourceMessengerSocketParams, apvts)
+      persistentTree(ananas::Utils::Identifiers::PersistentTreeType)
 {
+    renderers.push_back(std::make_unique<ananas::WFS::WfsRenderer>(apvts));
+
+    // One audio stream per renderer.
+    std::vector<ananas::Server::StreamConfig> streamConfigs;
+    for (const auto &renderer: renderers) {
+        streamConfigs.push_back(renderer->getStreamConfig());
+        streamBuffers.emplace_back(static_cast<int>(renderer->getStreamConfig().numChannels), 0);
+    }
+    server = std::make_unique<ananas::Server::Server>(streamConfigs);
+
     server->getClientList()->addChangeListener(this);
     server->getModuleList()->addChangeListener(this);
     server->getAuthority()->addChangeListener(this);
@@ -36,19 +45,16 @@ PluginProcessor::~PluginProcessor()
     apvts.removeParameterListener(ananas::WFS::Params::SpeakerSpacing.id, this);
     stopTimer();
     cancelPendingUpdate();
-    for (uint n{0}; n < ananas::WFS::Constants::NumSources; ++n) {
-        apvts.removeParameterListener(ananas::WFS::Params::getVirtualSourcePositionParamID(n, ananas::WFS::SourcePositionAxis::X), &virtualSourceMessenger);
-        apvts.removeParameterListener(ananas::WFS::Params::getVirtualSourcePositionParamID(n, ananas::WFS::SourcePositionAxis::Y), &virtualSourceMessenger);
-    }
-    if (virtualSourceMessenger.isThreadRunning()) {
-        virtualSourceMessenger.stopThread(ananas::WFS::Constants::WFSMessengerThreadTimeout);
-    }
 }
 
 void PluginProcessor::prepareToPlay(const double sampleRate, const int samplesPerBlock)
 {
+    for (size_t i{0}; i < renderers.size(); ++i) {
+        streamBuffers[i].setSize(streamBuffers[i].getNumChannels(), samplesPerBlock);
+        renderers[i]->prepare(sampleRate, samplesPerBlock);
+    }
+
     server->prepareToPlay(samplesPerBlock, sampleRate);
-    virtualSourceMessenger.startThread();
 }
 
 void PluginProcessor::releaseResources()
@@ -62,9 +68,18 @@ void PluginProcessor::processBlock(juce::AudioBuffer<float> &buffer, juce::MidiB
 
     juce::ScopedNoDenormals noDenormals;
 
-    const juce::AudioSourceChannelInfo block{buffer};
+    server->beginAudioBlock(buffer.getNumSamples());
 
-    server->getNextAudioBlock(block);
+    for (size_t i{0}; i < renderers.size(); ++i) {
+        if (server->isStreamActive(i)) {
+            auto &stream{streamBuffers[i]};
+            // Doesn't reallocate unless the host sends a larger block than
+            // announced in prepareToPlay.
+            stream.setSize(stream.getNumChannels(), buffer.getNumSamples(), false, false, true);
+            renderers[i]->process(buffer, stream);
+            server->writeStream(i, stream);
+        }
+    }
 
     // Store the max dB level for each channel for the current buffer.
     for (auto ch{0}; ch < buffer.getNumChannels(); ++ch) {
@@ -228,8 +243,9 @@ void PluginProcessor::changeListenerCallback(juce::ChangeBroadcaster *source)
 
         updateArrayLayout();
 
-        // Newly connected modules need the virtual source positions too.
-        resendVirtualSourcePositions();
+        for (const auto &renderer: renderers) {
+            renderer->modulesChanged();
+        }
     } else if (const auto *authority = dynamic_cast<ananas::AuthorityInfo *>(source)) {
         dynamicTree.setProperty(ananas::Utils::Identifiers::TimeAuthorityParamID, authority->toVar(), nullptr);
     } else if (const auto *switches = dynamic_cast<ananas::SwitchList *>(source)) {
@@ -248,9 +264,7 @@ void PluginProcessor::parameterChanged(const juce::String &parameterID, const fl
 
 void PluginProcessor::handleAsyncUpdate()
 {
-    if (updateArrayLayout()) {
-        resendVirtualSourcePositions();
-    }
+    updateArrayLayout();
 }
 
 void PluginProcessor::timerCallback()
@@ -263,20 +277,30 @@ void PluginProcessor::assignModuleToSlot(const int slot, const juce::String &mod
     server->getModuleList()->assignSlot(slot, moduleIP);
 }
 
-bool PluginProcessor::updateArrayLayout()
+void PluginProcessor::updateArrayLayout()
 {
     const auto numSlots{static_cast<int>(apvts.getRawParameterValue(ananas::WFS::Params::NumModules.id)->load())};
     const auto speakerSpacing{apvts.getRawParameterValue(ananas::WFS::Params::SpeakerSpacing.id)->load()};
+    const auto modules{server->getModuleList()->getEntries()};
 
-    const auto previousOuterSpeakerX{arrayLayout.outerSpeakerX};
-    arrayLayout = ananas::WFS::ArrayLayout::compute(server->getModuleList()->getEntries(), numSlots, speakerSpacing);
+    arrayLayout = ananas::WFS::ArrayLayout::compute(modules, numSlots, speakerSpacing);
 
     dynamicTree.setProperty(ananas::WFS::Identifiers::ArrayLayoutParamID, arrayLayout.toVar(), nullptr);
-    virtualSourceMessenger.setOuterSpeakerX(arrayLayout.outerSpeakerX);
+
+    // A renderer's stream is only sent while modules that play it are
+    // connected.
+    for (size_t i{0}; i < renderers.size(); ++i) {
+        const auto isNeeded{
+            std::any_of(modules.begin(), modules.end(), [&](const ananas::ModuleList::Entry &m)
+            {
+                return m.isConnected && renderers[i]->drivesModule(m.info.firmwareType);
+            })
+        };
+        server->setStreamActive(i, isNeeded);
+        renderers[i]->layoutChanged(arrayLayout);
+    }
 
     sendSpeakerPositions(false);
-
-    return !juce::approximatelyEqual(arrayLayout.outerSpeakerX, previousOuterSpeakerX);
 }
 
 void PluginProcessor::sendSpeakerPositions(const bool resendUnconfirmed)
@@ -325,16 +349,6 @@ bool PluginProcessor::isEchoedByModule(const ananas::ModuleInfo &info, const std
 
     return (positions.empty() || matches(info.reportedSecondarySource0, positions[0])) &&
            (positions.size() < 2 || matches(info.reportedSecondarySource1, positions[1]));
-}
-
-void PluginProcessor::resendVirtualSourcePositions()
-{
-    for (uint n{0}; n < ananas::WFS::Constants::NumSources; ++n) {
-        auto idX{ananas::WFS::Params::getVirtualSourcePositionParamID(n, ananas::WFS::SourcePositionAxis::X)},
-                idY{ananas::WFS::Params::getVirtualSourcePositionParamID(n, ananas::WFS::SourcePositionAxis::Y)};
-        virtualSourceMessenger.parameterChanged(idX, apvts.getRawParameterValue(idX)->load());
-        virtualSourceMessenger.parameterChanged(idY, apvts.getRawParameterValue(idY)->load());
-    }
 }
 
 juce::AudioProcessorValueTreeState &PluginProcessor::getParamState()
