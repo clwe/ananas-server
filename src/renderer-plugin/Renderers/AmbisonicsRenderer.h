@@ -15,8 +15,7 @@ namespace ananas::Ambisonics
      * position and the reference radius.
      */
     class AmbisonicsRenderer final : public Rendering::Renderer,
-                                     public juce::AudioProcessorValueTreeState::Listener,
-                                     juce::AsyncUpdater
+                                     juce::Timer
     {
     public:
         /**
@@ -39,8 +38,6 @@ namespace ananas::Ambisonics
 
         void modulesChanged() override;
 
-        void parameterChanged(const juce::String &parameterID, float newValue) override;
-
         /**
          * Largest distance from the listener to any of the speakers.
          * @return -1 if there are no speakers.
@@ -58,7 +55,11 @@ namespace ananas::Ambisonics
         static constexpr size_t NumChannels{WFS::Constants::NumAmbisonicChannels};
         static constexpr size_t NumSources{WFS::Constants::NumSources};
 
-        void handleAsyncUpdate() override;
+        // Sends control messages that changed (or all, after module
+        // changes), at most ControlMessageRateHz times per second.
+        void timerCallback() override;
+
+        static constexpr int ControlMessageRateHz{30};
 
         [[nodiscard]] juce::Point<float> getListenerMetres() const;
 
@@ -70,6 +71,7 @@ namespace ananas::Ambisonics
         std::atomic<float> outerSpeakerX{1.f};
         // Message thread only.
         std::vector<juce::Point<float>> speakerPositions;
+        bool shouldResendControlMessages{false};
         // Audio thread only: the gains used at the end of the previous block.
         std::array<std::array<float, NumChannels>, NumSources> gains{};
     };

@@ -1,5 +1,6 @@
 #include "AmbisonicsRenderer.h"
 #include "AmbisonicEncoder.h"
+#include <utility>
 
 namespace ananas::Ambisonics
 {
@@ -8,15 +9,12 @@ namespace ananas::Ambisonics
           passThroughChannelOffset(firstPassThroughChannel),
           controlMessenger(WFS::Sockets::AmbisonicsControlSocketParams)
     {
-        state.addParameterListener(WFS::Params::ListenerX.id, this);
-        state.addParameterListener(WFS::Params::ListenerY.id, this);
+        startTimerHz(ControlMessageRateHz);
     }
 
     AmbisonicsRenderer::~AmbisonicsRenderer()
     {
-        state.removeParameterListener(WFS::Params::ListenerX.id, this);
-        state.removeParameterListener(WFS::Params::ListenerY.id, this);
-        cancelPendingUpdate();
+        stopTimer();
     }
 
     bool AmbisonicsRenderer::drivesModule(const ::ananas::Utils::FirmwareType firmwareType) const
@@ -92,25 +90,17 @@ namespace ananas::Ambisonics
     {
         outerSpeakerX = layout.outerSpeakerX;
         speakerPositions = layout.getSpeakerPositions(::ananas::Utils::FirmwareType::ambisonicsModule);
-        sendControlMessages(false);
     }
 
     void AmbisonicsRenderer::modulesChanged()
     {
         // Modules don't store these; (re)connected modules need them.
-        sendControlMessages(true);
+        shouldResendControlMessages = true;
     }
 
-    void AmbisonicsRenderer::parameterChanged(const juce::String &parameterID, const float newValue)
+    void AmbisonicsRenderer::timerCallback()
     {
-        juce::ignoreUnused(parameterID, newValue);
-        // May be called from the audio thread.
-        triggerAsyncUpdate();
-    }
-
-    void AmbisonicsRenderer::handleAsyncUpdate()
-    {
-        sendControlMessages(false);
+        sendControlMessages(std::exchange(shouldResendControlMessages, false));
     }
 
     float AmbisonicsRenderer::computeRmax(const juce::Point<float> listener, const std::vector<juce::Point<float>> &speakers)
