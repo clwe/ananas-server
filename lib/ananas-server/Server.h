@@ -11,12 +11,31 @@
 
 namespace ananas::Server
 {
+    /**
+     * An outgoing multicast audio stream.
+     */
+    struct StreamConfig
+    {
+        // Must refer to strings with static lifetime.
+        Utils::SenderThreadSocketParams socketParams;
+        uint numChannels;
+    };
+
     class Server final : public juce::AudioSource,
                          public juce::ChangeListener,
                          public juce::ChangeBroadcaster
     {
     public:
+        /**
+         * A server with a single audio stream to Sockets::AudioSenderSocketParams.
+         */
         explicit Server(uint numChannelsToSend);
+
+        /**
+         * A server with one audio stream per config, all stamped against the
+         * same PTP time.
+         */
+        explicit Server(const std::vector<StreamConfig> &streamConfigs);
 
         ~Server() override;
 
@@ -24,7 +43,34 @@ namespace ananas::Server
 
         void releaseResources() override;
 
+        /**
+         * Writes the block to stream 0.
+         */
         void getNextAudioBlock(const juce::AudioSourceChannelInfo &bufferToFill) override;
+
+        /**
+         * Call from the audio thread once per block, before writeStream():
+         * checks for pauses, restarts and PTP time base changes, and estimates
+         * the current PTP time.
+         */
+        void beginAudioBlock(int numSamples);
+
+        /**
+         * Call from the audio thread for each stream after beginAudioBlock().
+         * The buffer should have at least as many channels as the stream.
+         * Ignored for inactive streams.
+         */
+        void writeStream(size_t streamIndex, const juce::AudioBuffer<float> &buffer);
+
+        /**
+         * An inactive stream isn't fed and sends nothing. Packets are
+         * re-stamped when a stream becomes active.
+         */
+        void setStreamActive(size_t streamIndex, bool shouldBeActive);
+
+        [[nodiscard]] bool isStreamActive(size_t streamIndex) const;
+
+        [[nodiscard]] size_t getNumStreams() const;
 
         void changeListenerCallback(ChangeBroadcaster *source) override;
 
@@ -286,16 +332,35 @@ namespace ananas::Server
 
         //======================================================================
 
+        struct AudioStream
+        {
+            explicit AudioStream(const StreamConfig &c) : config(c), fifo(static_cast<uint8_t>(c.numChannels)) {}
+
+            StreamConfig config;
+            Fifo fifo;
+            // Owned by Server::threads.
+            AudioSender *sender{nullptr};
+            std::atomic<bool> active{true};
+            // Re-stamp this stream's packets on the next block, e.g. when it
+            // becomes active.
+            std::atomic<bool> resyncOnNextBlock{false};
+        };
+
         JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(Server)
 
-        uint numChannels;
         // Local time of the previous audio block (audio thread only).
         int64_t lastAudioBlockTimeNs{0};
-        // Re-stamp packets on the next audio block, e.g. after the host
-        // re-prepared audio (such as on a buffer size change).
+        // Re-stamp all streams' packets on the next audio block, e.g. after
+        // the host re-prepared audio (such as on a buffer size change).
         std::atomic<bool> resyncOnNextBlock{false};
         double audioSampleRate{0};
-        Fifo fifo;
+        // Set by beginAudioBlock() for writeStream() (audio thread only).
+        bool blockHasPtpTime{false};
+        bool blockForcesResync{false};
+        int64_t blockPtpTimeNs{0};
+        // Declared before threads, which refer to the streams' FIFOs.
+        std::vector<std::unique_ptr<AudioStream>> streams;
+        TimestampListener *timestampListener{nullptr};
         SwitchList switches;
         ClientList clients;
         ModuleList modules;

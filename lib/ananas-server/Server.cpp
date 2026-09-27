@@ -18,12 +18,21 @@ namespace ananas::Server
         }
     }
 
-    Server::Server(const uint numChannelsToSend) : numChannels(numChannelsToSend),
-                                                   fifo(numChannelsToSend)
+    Server::Server(const uint numChannelsToSend)
+        : Server(std::vector<StreamConfig>{{Sockets::AudioSenderSocketParams, numChannelsToSend}})
     {
-        // Add all the threads.
-        threads.add(new AudioSender(Sockets::AudioSenderSocketParams, fifo));
-        threads.add(new TimestampListener(Sockets::TimestampListenerSocketParams));
+    }
+
+    Server::Server(const std::vector<StreamConfig> &streamConfigs)
+    {
+        // Add all the threads; one audio sender per stream.
+        for (const auto &config: streamConfigs) {
+            auto &stream{*streams.emplace_back(std::make_unique<AudioStream>(config))};
+            stream.sender = new AudioSender(config.socketParams, stream.fifo);
+            threads.add(stream.sender);
+        }
+        timestampListener = new TimestampListener(Sockets::TimestampListenerSocketParams);
+        threads.add(timestampListener);
         threads.add(new ClientListener(Sockets::ClientListenerSocketParams, clients, modules));
         threads.add(new AuthorityListener(Sockets::AuthorityListenerSocketParams, authority));
         threads.add(new RebootSender(Sockets::RebootSenderSocketParams, clients));
@@ -53,16 +62,18 @@ namespace ananas::Server
         resyncOnNextBlock = true;
         audioSampleRate = sampleRate;
 
-        fifo.prepare(std::max(Constants::FifoCapacityFrames, Constants::FifoCapacityBlocks * samplesPerBlockExpected));
+        for (const auto &stream: streams) {
+            stream->fifo.prepare(std::max(Constants::FifoCapacityFrames, Constants::FifoCapacityBlocks * samplesPerBlockExpected));
+            // With the audio sender prepared, and memory allocated to its
+            // AudioPacket member, it's safe to start the thread; prepare()
+            // does that.
+            stream->sender->prepare(stream->config.numChannels, samplesPerBlockExpected, sampleRate);
+        }
 
         for (const auto &t: threads) {
-            if (auto *s = dynamic_cast<AudioSender *>(t)) {
-                // The audio sender needs to be prepared; other threads do not.
-                s->prepare(numChannels, samplesPerBlockExpected, sampleRate);
+            if (dynamic_cast<AudioSender *>(t) == nullptr) {
+                t->startThread();
             }
-            // With the audio sender thread prepared, and memory allocated to
-            // its AudioPacket member, it's safe to start all the threads.
-            t->startThread();
         }
     }
 
@@ -84,45 +95,81 @@ namespace ananas::Server
 
     void Server::getNextAudioBlock(const juce::AudioSourceChannelInfo &bufferToFill)
     {
-        // These checks are kind of overkill, since the order in which threads
-        // were added to the OwnedArray is known, but as a santiy check...
+        beginAudioBlock(bufferToFill.numSamples);
+        writeStream(0, *bufferToFill.buffer);
+    }
+
+    void Server::beginAudioBlock(const int numSamples)
+    {
         const auto nowNs{getSteadyTimeNs()};
         const auto timeSinceLastBlockNs{lastAudioBlockTimeNs > 0 ? nowNs - lastAudioBlockTimeNs : 0};
         lastAudioBlockTimeNs = nowNs;
 
-        if (auto *s = dynamic_cast<AudioSender *>(threads[0])) {
-            if (auto *t = dynamic_cast<TimestampListener *>(threads[1])) {
-                const auto timebaseChanged{t->hasTimebaseChanged()};
-                const auto blockDurationNs{
-                    audioSampleRate > 0 ? static_cast<int64_t>(bufferToFill.numSamples * Constants::NSPS / audioSampleRate) : 0
-                };
-                const auto gapThresholdNs{std::max(Constants::AudioGapThresholdNs, Constants::AudioGapThresholdBlocks * blockDurationNs)};
-                const auto resumedAfterGap{timeSinceLastBlockNs > gapThresholdNs};
-                const auto restarted{resyncOnNextBlock.exchange(false)};
+        const auto timebaseChanged{timestampListener->hasTimebaseChanged()};
+        const auto blockDurationNs{
+            audioSampleRate > 0 ? static_cast<int64_t>(numSamples * Constants::NSPS / audioSampleRate) : 0
+        };
+        const auto gapThresholdNs{std::max(Constants::AudioGapThresholdNs, Constants::AudioGapThresholdBlocks * blockDurationNs)};
+        const auto resumedAfterGap{timeSinceLastBlockNs > gapThresholdNs};
+        const auto restarted{resyncOnNextBlock.exchange(false)};
 
-                if (timebaseChanged || resumedAfterGap || restarted) {
-                    // Packet timestamps are no longer continuous with PTP time,
-                    // so re-stamp now rather than waiting for several bad
-                    // Follow_Ups. Estimate the current PTP time from the latest
-                    // Follow_Up and the time elapsed since it arrived.
-                    if (const auto ts{t->getTimestamp()}; ts.receiveTimeNs > 0) {
-                        if (resumedAfterGap) {
-                            std::cout << "Audio resumed after " << timeSinceLastBlockNs / 1'000'000 << " ms." << std::endl;
-                        } else if (restarted) {
-                            std::cout << "Audio restarted." << std::endl;
-                        }
-                        s->setPacketTime(ts.ptpTimeNs + (nowNs - ts.receiveTimeNs), true);
-                    }
-                } else if (const auto ts{t->getTimestamp()}; ts.receiveTimeNs > 0) {
-                    // Check the packet timestamp against the current PTP time,
-                    // estimated from the latest Follow_Up and the time since it
-                    // arrived.
-                    s->setPacketTime(ts.ptpTimeNs + (nowNs - ts.receiveTimeNs), false);
-                }
+        // Estimate the current PTP time from the latest Follow_Up and the time
+        // elapsed since it arrived.
+        const auto ts{timestampListener->getTimestamp()};
+        blockHasPtpTime = ts.receiveTimeNs > 0;
+        blockPtpTimeNs = ts.ptpTimeNs + (nowNs - ts.receiveTimeNs);
+
+        // If packet timestamps are no longer continuous with PTP time,
+        // re-stamp now rather than waiting for them to be found off.
+        blockForcesResync = timebaseChanged || resumedAfterGap || restarted;
+
+        if (blockHasPtpTime) {
+            if (resumedAfterGap) {
+                std::cout << "Audio resumed after " << timeSinceLastBlockNs / 1'000'000 << " ms." << std::endl;
+            } else if (restarted) {
+                std::cout << "Audio restarted." << std::endl;
             }
         }
+    }
 
-        fifo.write(bufferToFill.buffer);
+    void Server::writeStream(const size_t streamIndex, const juce::AudioBuffer<float> &buffer)
+    {
+        if (streamIndex >= streams.size()) return;
+
+        auto &stream{*streams[streamIndex]};
+        if (!stream.active.load()) return;
+
+        if (blockHasPtpTime) {
+            // Check the packet timestamp against the current PTP time, or
+            // re-stamp.
+            const auto streamResync{stream.resyncOnNextBlock.exchange(false)};
+            stream.sender->setPacketTime(blockPtpTimeNs, blockForcesResync || streamResync);
+        }
+
+        stream.fifo.write(&buffer);
+    }
+
+    void Server::setStreamActive(const size_t streamIndex, const bool shouldBeActive)
+    {
+        if (streamIndex >= streams.size()) return;
+
+        auto &stream{*streams[streamIndex]};
+        if (stream.active.exchange(shouldBeActive) != shouldBeActive) {
+            std::cout << juce::String{stream.config.socketParams.name} << (shouldBeActive ? " active." : " inactive.") << std::endl;
+            if (shouldBeActive) {
+                stream.resyncOnNextBlock = true;
+            }
+        }
+    }
+
+    bool Server::isStreamActive(const size_t streamIndex) const
+    {
+        return streamIndex < streams.size() && streams[streamIndex]->active.load();
+    }
+
+    size_t Server::getNumStreams() const
+    {
+        return streams.size();
     }
 
     void Server::changeListenerCallback(ChangeBroadcaster *source)
