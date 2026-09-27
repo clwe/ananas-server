@@ -32,3 +32,5 @@ add_subdirectory(lib/network-ui)
 add_subdirectory(src/ananas-server-plugin)
 
 add_subdirectory(src/renderer-plugin)
+
+add_subdirectory(tests)
