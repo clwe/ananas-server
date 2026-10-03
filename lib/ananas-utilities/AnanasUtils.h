@@ -76,6 +76,7 @@ namespace ananas
             inline static const juce::Identifier PersistentTreeType{"PersistentData"};
 
             inline const static juce::Identifier SwitchesParamID{"Switches"};
+            inline const static juce::Identifier SwitchTreeType{"Switch"};
 
             inline static const juce::Identifier SwitchIdentifierBase{"switch_"};
             inline const static juce::Identifier SwitchIpPropertyID{"switchIP"};
@@ -104,6 +105,7 @@ namespace ananas
             inline const static juce::Identifier AuthorityFeedbackAccumulatorPropertyID{"feedbackAccumulator"};
 
             inline static const juce::Identifier ConnectedClientsParamID{"ConnectedClients"};
+            inline static const juce::Identifier ClientTreeType{"Client"};
             inline const static juce::Identifier ClientsShouldRebootParamID{"ClientsShouldReboot"};
 
             inline const static juce::Identifier ClientSerialNumberPropertyID{"serialNumber"};
@@ -119,6 +121,7 @@ namespace ananas
             inline const static juce::Identifier ClientSourcesSpeakersPropertyID{"sourcesSpeakers"};
 
             inline const static juce::Identifier ModulesParamID{"Modules"};
+            inline const static juce::Identifier ModuleTreeType{"Module"};
 
             inline const static juce::Identifier ModuleSlotPropertyID{"ModuleSlot"};
             inline const static juce::Identifier ModuleFirmwareTypePropertyID{"ModuleFirmwareType"};

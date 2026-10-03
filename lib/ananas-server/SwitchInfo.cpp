@@ -35,7 +35,7 @@ namespace ananas
 
     juce::ValueTree SwitchInfo::toValueTree() const
     {
-        juce::ValueTree tree("Switch");
+        juce::ValueTree tree(Utils::Identifiers::SwitchTreeType);
         tree.setProperty(Utils::Identifiers::SwitchIpPropertyID, ip, nullptr);
         tree.setProperty(Utils::Identifiers::SwitchUsernamePropertyID, username, nullptr);
         tree.setProperty(Utils::Identifiers::SwitchPasswordPropertyID, password, nullptr);
@@ -177,6 +177,7 @@ namespace ananas
 
             for (int i{0}; i < tree.getNumChildren(); ++i) {
                 auto switchTree{tree.getChild(i)};
+                if (!switchTree.hasType(Utils::Identifiers::SwitchTreeType)) continue;
                 const auto identifier{switchTree.getProperty("identifier").toString()};
                 if (identifier.isEmpty()) continue;
                 switches[identifier] = SwitchInfo::fromValueTree(switchTree);

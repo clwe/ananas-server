@@ -6,6 +6,7 @@ target_sources(ananas_tests
         Main.cpp
         ArrayLayoutTests.cpp
         ModuleListTests.cpp
+        SwitchListTests.cpp
         AmbisonicEncoderTests.cpp
         AmbisonicsRendererTests.cpp
         ${CMAKE_SOURCE_DIR}/src/renderer-plugin/ArrayLayout.cpp

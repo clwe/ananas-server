@@ -48,7 +48,7 @@ namespace ananas
 
     juce::ValueTree ModuleInfo::toValueTree() const
     {
-        juce::ValueTree tree{"Module"};
+        juce::ValueTree tree{Utils::Identifiers::ModuleTreeType};
         tree.setProperty(Utils::Identifiers::ModuleSlotPropertyID, slot, nullptr);
         tree.setProperty(Utils::Identifiers::ModuleFirmwareTypePropertyID, static_cast<int>(firmwareType), nullptr);
         tree.setProperty(Utils::Identifiers::ModuleNumSourcesPropertyID, numSources, nullptr);
@@ -198,7 +198,7 @@ namespace ananas
         juce::ValueTree tree(Utils::Identifiers::ConnectedClientsParamID);
 
         for (const auto &[ip, _]: clients) {
-            juce::ValueTree subTree("Client");
+            juce::ValueTree subTree(Utils::Identifiers::ClientTreeType);
             subTree.setProperty("ip", ip, nullptr);
             tree.addChild(subTree, -1, nullptr);
         }
@@ -348,6 +348,7 @@ namespace ananas
 
             for (int i{0}; i < tree.getNumChildren(); ++i) {
                 auto moduleTree{tree.getChild(i)};
+                if (!moduleTree.hasType(Utils::Identifiers::ModuleTreeType)) continue;
                 const auto ip{moduleTree.getProperty("ip").toString()};
                 if (ip.isEmpty()) continue;
                 modules[ip] = ModuleInfo::fromValueTree(moduleTree);
