@@ -34,13 +34,22 @@ Positions stay on the server; the firmware never stores or hardcodes them.
       (module serial number + output index; the serial rather than the IP).
       Optional per speaker: delay, gain, subwoofer flag, "imaginary" (no
       output, for AllRAD).
+- [ ] **Edit the speaker positions in the UI first**, so they can be checked
+      for plausibility before anything is saved: a table (position, z,
+      orientation, module, output) next to the top-down view, which shows
+      each speaker with its orientation and the module it belongs to.
+      Point out what looks wrong: speakers at the same position, a module
+      output used twice or not at all, speakers facing away from the
+      listening area, and a listener or sources placed where the layout
+      can't render them. Saving to a file comes afterwards (below).
 - [ ] **The current linear array becomes a generator** ("N modules, spacing
       d") that produces such a list, so the WFS workflow stays as it is;
       `ArrayLayout::compute` turns into that generator. `/ss` keeps sending
       each module the positions of its outputs; outputs that aren't in the
       layout get none, or are muted.
-- [ ] **Ananas layout file in JSON:** file-wide settings (format version,
-      units, coordinate convention, reference point) plus the speaker list,
+- [ ] **Save and load the edited layout as an Ananas JSON file:** file-wide
+      settings (format version, units, coordinate convention, reference
+      point) plus the speaker list,
       and room for generators and new fields. Read and written with
       `juce::JSON`. Stored separately from projects, since it describes the
       room, not the piece; projects refer to it.
@@ -56,8 +65,6 @@ Positions stay on the server; the firmware never stores or hardcodes them.
       spherical formats needs the listener position as reference. None of
       them can express "module serial, output"; that mapping stays
       Ananas-specific.
-- [ ] **UI:** edit the layout in a table and in the top-down view; elevated
-      speakers via a z value.
 - [ ] **Speaker identification:** play noise on one module output at a time,
       to find which physical speaker is wired where. Needs a small firmware
       command for Ambisonics modules, whose stream doesn't address single
