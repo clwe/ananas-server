@@ -21,6 +21,50 @@
       panners and show control can position sources. The internal protocol to
       the modules stays as it is.
 
+## Speaker layouts
+
+The server can only infer speaker positions from what modules announce for
+the evenly spaced linear array. For arbitrary layouts it needs an explicit
+description of where each speaker is and which module output drives it.
+Positions stay on the server; the firmware never stores or hardcodes them.
+
+- [ ] **Layout as data.** One entry per physical speaker: position
+      (x, y, z, metres, array frame), orientation (needed by WFS to pick the
+      speakers facing a source), and the module output it's connected to
+      (module serial number + output index; the serial rather than the IP).
+      Optional per speaker: delay, gain, subwoofer flag, "imaginary" (no
+      output, for AllRAD).
+- [ ] **The current linear array becomes a generator** ("N modules, spacing
+      d") that produces such a list, so the WFS workflow stays as it is;
+      `ArrayLayout::compute` turns into that generator. `/ss` keeps sending
+      each module the positions of its outputs; outputs that aren't in the
+      layout get none, or are muted.
+- [ ] **Ananas layout file in JSON:** file-wide settings (format version,
+      units, coordinate convention, reference point) plus the speaker list,
+      and room for generators and new fields. Read and written with
+      `juce::JSON`. Stored separately from projects, since it describes the
+      room, not the piece; projects refer to it.
+- [ ] **CSV import and export of the speaker table only** (position,
+      orientation, module serial, output), for editing in spreadsheets and
+      importing from design tools. Fixed header row, decimal point, explicit
+      separator (German Excel writes `;` and decimal commas).
+- [ ] **Import/export of common formats:** IEM JSON (`LoudspeakerLayout`;
+      also used by SPARTA), EBU ADM Renderer YAML (`az`/`el`/`r`, BS.2051
+      names), SSR ASDF XML (`<reproduction_setup>`, cartesian with
+      orientation, closest to Ananas). Their azimuth convention (0° front,
+      counter-clockwise) matches the encoder's; converting the listener-centred
+      spherical formats needs the listener position as reference. None of
+      them can express "module serial, output"; that mapping stays
+      Ananas-specific.
+- [ ] **UI:** edit the layout in a table and in the top-down view; elevated
+      speakers via a z value.
+- [ ] **Speaker identification:** play noise on one module output at a time,
+      to find which physical speaker is wired where. Needs a small firmware
+      command for Ambisonics modules, whose stream doesn't address single
+      outputs.
+- [ ] **Protocol extensions:** `/ss/<j>/z` for elevated speakers, and
+      `/ss/<j>/nx|ny` (orientation) for WFS on non-linear layouts.
+
 ## Ambisonics
 
 - [x] Test with real Ambisonics firmware, once it implements
@@ -32,11 +76,9 @@
       uses the lowest. Measure the decoder's CPU cost per output first. For
       horizontal-only arrays, consider 2-D (circular) Ambisonics: 2N+1
       channels instead of (N+1)².
-- [ ] **Arbitrary 2-D/3-D layouts.** Speaker positions entered per speaker
-      (or imported) instead of the evenly spaced line from `ArrayLayout`;
-      send `/ss/<j>/z` for elevated speakers. Irregular layouts may need a
-      different decoder in the firmware (e.g. AllRAD) than the sampling
-      decoder.
+- [ ] **Decoder for irregular layouts.** With arbitrary speaker layouts (see
+      "Speaker layouts"), the firmware's sampling decoder may need to be
+      replaced or complemented, e.g. by AllRAD.
 - [ ] **Source distance.** The encoder only uses each source's direction
       (plane waves), so a source's distance from the listener has no effect.
       First step: distance gain (and optionally delay); then near-field
