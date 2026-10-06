@@ -325,7 +325,7 @@ namespace ananas
         return object;
     }
 
-    juce::ValueTree ModuleList::toValueTree() const
+    juce::ValueTree ModuleList::toValueTree(const bool includeConnectionState) const
     {
         const juce::ScopedLock sl{lock};
         juce::ValueTree tree(Utils::Identifiers::ModulesParamID);
@@ -333,6 +333,9 @@ namespace ananas
         for (const auto &[ip, m]: modules) {
             auto moduleTree{m.toValueTree()};
             moduleTree.setProperty("ip", ip, nullptr);
+            if (includeConnectionState) {
+                moduleTree.setProperty(Utils::Identifiers::ModuleIsConnectedPropertyID, m.isConnected(), nullptr);
+            }
             tree.addChild(moduleTree, -1, nullptr);
         }
 
