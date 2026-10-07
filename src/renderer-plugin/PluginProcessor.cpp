@@ -35,6 +35,8 @@ PluginProcessor::PluginProcessor()
         virtualSourceAmplitudes.set(static_cast<int>(n), new std::atomic{0.f});
     }
 
+    modulesTree = persistentTree.getOrCreateChildWithName(ananas::Utils::Identifiers::ModulesParamID, nullptr);
+
     updateArrayLayout();
     startTimer(ananas::WFS::Constants::SpeakerPositionResendIntervalMs / 2);
 }
@@ -242,8 +244,7 @@ void PluginProcessor::changeListenerCallback(juce::ChangeBroadcaster *source)
     if (const auto *clients = dynamic_cast<ananas::ClientList *>(source)) {
         dynamicTree.setProperty(ananas::Utils::Identifiers::ConnectedClientsParamID, clients->toVar(), nullptr);
     } else if (const auto *modules = dynamic_cast<ananas::ModuleList *>(source)) {
-        persistentTree.setProperty(ananas::Utils::Identifiers::ModulesParamID, modules->toVar(), nullptr);
-        persistentTree.sendPropertyChangeMessage(ananas::Utils::Identifiers::ModulesParamID);
+        modulesTree.copyPropertiesAndChildrenFrom(modules->toValueTree(true), nullptr);
 
         updateArrayLayout();
 

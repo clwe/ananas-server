@@ -122,6 +122,8 @@ private:
     juce::ValueTree dynamicTree;
     // For handling user-entered data that should be storable/retrievable.
     juce::ValueTree persistentTree;
+    // The module list, mirrored as child nodes of persistentTree for the UI.
+    juce::ValueTree modulesTree;
 
     ananas::WFS::SecondarySourceMessenger secondarySourceMessenger;
 

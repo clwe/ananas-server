@@ -93,14 +93,20 @@ namespace ananas::WFS::UI
         state.addParameterListener(Params::ShowModuleSelectors.id, this);
 
         // Listen to the dynamic tree for changes to the array layout (number
-        // of modules, speakers per module, spacing), and set up the modules.
+        // of modules, speakers per module, spacing)
         dynamicTree.addListener(this);
+
+        // get the modules node
+        modulesNode = persistentTree.getChildWithName(ananas::Utils::Identifiers::ModulesParamID);
+
+        // and set up the modules.
         updateArrayLayout(dynamicTree[Identifiers::ArrayLayoutParamID]);
 
         // Listen to the persistent tree for module selection changes.
         persistentTree.addListener(this);
-        // Trigger an initial property change so that combo boxes get populated.
-        persistentTree.sendPropertyChangeMessage(ananas::Utils::Identifiers::ModulesParamID);
+
+        // Populate the module selectors.
+        updateModuleLists();
     }
 
     WFSInterfaceComponent::~WFSInterfaceComponent()
@@ -171,26 +177,24 @@ namespace ananas::WFS::UI
 #endif
     }
 
-    void WFSInterfaceComponent::updateModuleLists(const juce::var &var)
+    void WFSInterfaceComponent::updateModuleLists()
     {
         juce::StringArray ips, labels;
         std::map<int, juce::String> slotModules;
         auto hasAmbisonicsModules{false};
 
-        if (auto *obj = var.getDynamicObject()) {
-            for (const auto &prop: obj->getProperties()) {
-                if (const auto *module = prop.value.getDynamicObject()) {
-                    if (module->getProperty(ananas::Utils::Identifiers::ModuleIsConnectedPropertyID)) {
-                        const auto type{static_cast<ananas::Utils::FirmwareType>(static_cast<int>(
-                            module->getProperty(ananas::Utils::Identifiers::ModuleFirmwareTypePropertyID)))};
-                        ips.add(prop.name.toString());
-                        labels.add(prop.name.toString() + " (" + ananas::Utils::FirmwareTypeToString(type) + ")");
-                        hasAmbisonicsModules |= type == ananas::Utils::FirmwareType::ambisonicsModule;
-                    }
-                    if (const int slot{module->getProperty(ananas::Utils::Identifiers::ModuleSlotPropertyID)}; slot >= 0) {
-                        slotModules[slot] = prop.name.toString();
-                    }
-                }
+        for (const auto &module : modulesNode) {
+            const auto ip{module.getProperty("ip").toString()};
+            if (module.getProperty(ananas::Utils::Identifiers::ModuleIsConnectedPropertyID)) {
+                const auto type{static_cast<ananas::Utils::FirmwareType>(static_cast<int>(
+                    module.getProperty(ananas::Utils::Identifiers::ModuleFirmwareTypePropertyID)))};
+                ips.add(ip);
+                labels.add(ip + " (" + ananas::Utils::FirmwareTypeToString(type) + ")");
+
+                hasAmbisonicsModules |= type == ananas::Utils::FirmwareType::ambisonicsModule;
+            }
+            if (const int slot{module.getProperty(ananas::Utils::Identifiers::ModuleSlotPropertyID)}; slot >= 0) {
+                slotModules[slot] = ip;
             }
         }
 
@@ -230,7 +234,7 @@ namespace ananas::WFS::UI
                 m->setBroughtToFrontOnMouseClick(true);
                 m->shouldShowModuleSelector(showModuleSelectors);
             }
-            updateModuleLists(persistentTree[ananas::Utils::Identifiers::ModulesParamID]);
+            updateModuleLists();
         }
 
         // Speaker icons, one per speaker.
@@ -274,10 +278,24 @@ namespace ananas::WFS::UI
     {
         // if (!isVisible()) return;
 
-        if (property == ananas::Utils::Identifiers::ModulesParamID) {
-            updateModuleLists(treeWhosePropertyHasChanged[property]);
+        if (treeWhosePropertyHasChanged.hasType(ananas::Utils::Identifiers::ModuleTreeType)) {
+            updateModuleLists();
         } else if (property == Identifiers::ArrayLayoutParamID) {
             updateArrayLayout(treeWhosePropertyHasChanged[property]);
+        }
+    }
+
+    void WFSInterfaceComponent::valueTreeChildAdded(juce::ValueTree &parentTree, juce::ValueTree &) 
+    {
+        if (parentTree == modulesNode) {
+            updateModuleLists();
+        }
+    }
+
+    void WFSInterfaceComponent::valueTreeChildRemoved(juce::ValueTree &parentTree, juce::ValueTree &, int) 
+    {
+        if (parentTree == modulesNode) {
+            updateModuleLists();
         }
     }
 

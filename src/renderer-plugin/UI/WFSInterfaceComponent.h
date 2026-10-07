@@ -34,7 +34,7 @@ namespace ananas::WFS::UI
 
         void resized() override;
 
-        void updateModuleLists(const juce::var &var);
+        void updateModuleLists();
 
         void updateArrayLayout(const juce::var &var);
 
@@ -43,6 +43,10 @@ namespace ananas::WFS::UI
         void parameterChanged(const juce::String &parameterID, float newValue) override;
 
         void expandModuleList(int moduleID);
+
+        void valueTreeChildAdded(juce::ValueTree &parentTree, juce::ValueTree &childWhichHasBeenAdded) override;
+
+        void valueTreeChildRemoved(juce::ValueTree &parentTree, juce::ValueTree &childWhichHasBeenRemoved, int indexFromWhichChildWasRemoved) override;
 
     private:
         JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(WFSInterfaceComponent)
@@ -65,6 +69,7 @@ namespace ananas::WFS::UI
         std::unique_ptr<juce::AudioProcessorValueTreeState::ComboBoxAttachment> ambisonicsInputAttachment;
         juce::ValueTree &persistentTree;
         juce::ValueTree &dynamicTree;
+        juce::ValueTree modulesNode;
         ModuleComponent::SelectionCallback onModuleSelected;
         // Number of speakers in each module slot.
         std::vector<int> slotNumSpeakers;
