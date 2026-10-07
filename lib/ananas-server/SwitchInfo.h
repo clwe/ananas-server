@@ -14,7 +14,7 @@ namespace ananas
 
         [[nodiscard]] juce::var toVar() const;
 
-        [[nodiscard]] juce::ValueTree toValueTree() const;
+        [[nodiscard]] juce::ValueTree toValueTree(bool includeStatus = false) const;
 
         static SwitchInfo fromValueTree(const juce::ValueTree& tree);
 
@@ -50,7 +50,7 @@ namespace ananas
 
         [[nodiscard]] juce::var toVar() const;
 
-        [[nodiscard]] juce::ValueTree toValueTree() const;
+        [[nodiscard]] juce::ValueTree toValueTree(bool includeStatus = false) const;
 
         void fromValueTree(const juce::ValueTree& tree);
 

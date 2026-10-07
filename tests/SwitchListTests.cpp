@@ -40,6 +40,31 @@ public:
             expect(filtered.toValueTree().isEquivalentTo(saved));   // switch_3 must not appear
         }
 
+        auto *answer{new juce::DynamicObject()};
+        answer->setProperty(ananas::Utils::Identifiers::SwitchFreqDriftPropertyId, 12);
+        answer->setProperty(ananas::Utils::Identifiers::SwitchOffsetPropertyId, -5);
+        juce::Array<juce::var> response; response.add(answer);
+        list.handleResponse("switch_1", response);
+
+        beginTest("Check switch status fields");
+        {
+            // With status: the child for switch_1 has drift and offset.
+            const auto withStatus{list.toValueTree(true)};
+            const auto switch1{withStatus.getChildWithProperty("identifier", "switch_1")};
+
+            expect(switch1.isValid());
+            expectEquals(static_cast<int>(switch1.getProperty(ananas::Utils::Identifiers::SwitchFreqDriftPropertyId)), 12);
+            expectEquals(static_cast<int>(switch1.getProperty(ananas::Utils::Identifiers::SwitchOffsetPropertyId)), -5);
+
+            // Without status (what gets saved): no drift or offset.
+            const auto withoutStatus{list.toValueTree()};
+            const auto savedSwitch1{withoutStatus.getChildWithProperty("identifier", "switch_1")};
+
+            expect(!savedSwitch1.hasProperty(ananas::Utils::Identifiers::SwitchFreqDriftPropertyId));
+            expect(!savedSwitch1.hasProperty(ananas::Utils::Identifiers::SwitchOffsetPropertyId));
+        }
+
+
 
     }
 

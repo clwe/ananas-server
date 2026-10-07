@@ -33,12 +33,16 @@ namespace ananas
         return object;
     }
 
-    juce::ValueTree SwitchInfo::toValueTree() const
+    juce::ValueTree SwitchInfo::toValueTree(const bool includeStatus) const
     {
         juce::ValueTree tree(Utils::Identifiers::SwitchTreeType);
         tree.setProperty(Utils::Identifiers::SwitchIpPropertyID, ip, nullptr);
         tree.setProperty(Utils::Identifiers::SwitchUsernamePropertyID, username, nullptr);
         tree.setProperty(Utils::Identifiers::SwitchPasswordPropertyID, password, nullptr);
+        if (includeStatus) {
+            tree.setProperty(Utils::Identifiers::SwitchFreqDriftPropertyId, freqDrift, nullptr);
+            tree.setProperty(Utils::Identifiers::SwitchOffsetPropertyId, offset, nullptr);
+        }
         return tree;
     }
 
@@ -154,13 +158,13 @@ namespace ananas
         return object;
     }
 
-    juce::ValueTree SwitchList::toValueTree() const
+    juce::ValueTree SwitchList::toValueTree(const bool includeStatus) const
     {
         const juce::ScopedLock sl{lock};
         juce::ValueTree tree(Utils::Identifiers::SwitchesParamID);
 
         for (const auto &[identifier, switchInfo]: switches) {
-            auto switchTree{switchInfo.toValueTree()};
+            auto switchTree{switchInfo.toValueTree(includeStatus)};
             switchTree.setProperty("identifier", identifier.toString(), nullptr);
             tree.addChild(switchTree, -1, nullptr);
         }
