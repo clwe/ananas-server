@@ -307,24 +307,6 @@ namespace ananas
         return entries;
     }
 
-    juce::var ModuleList::toVar() const
-    {
-        const juce::ScopedLock sl{lock};
-        const auto object{new juce::DynamicObject()};
-
-        for (const auto &[ip, m]: modules) {
-            auto *module{new juce::DynamicObject()};
-            module->setProperty(Utils::Identifiers::ModuleSlotPropertyID, m.slot);
-            module->setProperty(Utils::Identifiers::ModuleFirmwareTypePropertyID, static_cast<int>(m.firmwareType));
-            module->setProperty(Utils::Identifiers::ModuleNumSourcesPropertyID, m.numSources);
-            module->setProperty(Utils::Identifiers::ModuleNumSpeakersPropertyID, m.numSpeakers);
-            module->setProperty(Utils::Identifiers::ModuleIsConnectedPropertyID, m.isConnected());
-            object->setProperty(ip, module);
-        }
-
-        return object;
-    }
-
     juce::ValueTree ModuleList::toValueTree(const bool includeConnectionState) const
     {
         const juce::ScopedLock sl{lock};

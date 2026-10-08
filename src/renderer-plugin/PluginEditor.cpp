@@ -7,7 +7,8 @@ PluginEditor::PluginEditor(PluginProcessor &p)
       tooltipWindow(this, ananas::UI::Timing::TooltipDelayTimeMs),
       networkOverview(
           getProcessor().getDynamicTree(),
-          getProcessor().getPersistentTree()
+          getProcessor().getPersistentTree(),
+          *getProcessor().getServer().getSwitches()
       ),
       wfsInterface(
           ananas::WFS::Constants::NumSources,
@@ -84,9 +85,7 @@ void PluginEditor::resized()
 
 void PluginEditor::valueTreePropertyChanged(juce::ValueTree &treeWhosePropertyHasChanged, const juce::Identifier &property)
 {
-    if (property == ananas::Utils::Identifiers::SwitchesParamID) {
-        getProcessor().getServer().getSwitches()->handleEdit(treeWhosePropertyHasChanged[property]);
-    } else if (property == ananas::Utils::Identifiers::ClientsShouldRebootParamID) {
+    if (property == ananas::Utils::Identifiers::ClientsShouldRebootParamID) {
         getProcessor().getServer().getClientList()->setShouldReboot(treeWhosePropertyHasChanged[property]);
         treeWhosePropertyHasChanged.setPropertyExcludingListener(this, property, false, nullptr);
     }

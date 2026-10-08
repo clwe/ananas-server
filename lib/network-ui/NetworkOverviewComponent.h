@@ -18,7 +18,7 @@ namespace ananas::UI
 #endif
     {
     public:
-        NetworkOverviewComponent(juce::ValueTree &dynamicTree, juce::ValueTree &persistentTree);
+        NetworkOverviewComponent(juce::ValueTree &dynamicTree, juce::ValueTree &persistentTree, SwitchList &switchList);
 
         //======================================================================
 

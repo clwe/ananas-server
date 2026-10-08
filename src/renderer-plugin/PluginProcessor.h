@@ -124,6 +124,8 @@ private:
     juce::ValueTree persistentTree;
     // The module list, mirrored as child nodes of persistentTree for the UI.
     juce::ValueTree modulesTree;
+    // The switch list, mirrored as child nodes of persistentTree for the UI.
+    juce::ValueTree switchesTree;
 
     ananas::WFS::SecondarySourceMessenger secondarySourceMessenger;
 

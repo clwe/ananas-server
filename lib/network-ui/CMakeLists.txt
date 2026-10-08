@@ -24,9 +24,10 @@ target_compile_definitions(ananas_network_overview
 )
 
 target_link_libraries(ananas_network_overview
+        PUBLIC
+        ananas_server
         PRIVATE
         juce::juce_core
         ananas_utilities
         ananas_ui
-        ananas_server
 )

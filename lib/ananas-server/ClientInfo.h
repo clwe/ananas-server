@@ -107,8 +107,6 @@ namespace ananas
 
         [[nodiscard]] std::vector<Entry> getEntries() const;
 
-        [[nodiscard]] juce::var toVar() const;
-
         [[nodiscard]] juce::ValueTree toValueTree(bool includeConnectionState = false) const;
 
         void fromValueTree(const juce::ValueTree &tree);

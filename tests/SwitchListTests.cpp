@@ -10,10 +10,8 @@ public:
     {
         ananas::SwitchList list;
 
-        auto *edit{new juce::DynamicObject()};
-        edit->setProperty("switch_1", makeSwitch("192.168.10.2", "admin", "secret"));
-        edit->setProperty("switch_2", makeSwitch("192.168.10.3", "admin", "other"));
-        list.handleEdit(edit);
+        list.setSwitch("switch_1", "192.168.10.2", "admin", "secret");
+        list.setSwitch("switch_2", "192.168.10.3", "admin", "other");
 
         const auto saved{list.toValueTree()};
         ananas::SwitchList restored;
@@ -63,18 +61,6 @@ public:
             expect(!savedSwitch1.hasProperty(ananas::Utils::Identifiers::SwitchFreqDriftPropertyId));
             expect(!savedSwitch1.hasProperty(ananas::Utils::Identifiers::SwitchOffsetPropertyId));
         }
-
-
-
-    }
-
-    juce::var makeSwitch(const juce::String &ip, const juce::String &user, const juce::String &password)
-    {
-        auto *s{new juce::DynamicObject()};
-        s->setProperty(ananas::Utils::Identifiers::SwitchIpPropertyID, ip);
-        s->setProperty(ananas::Utils::Identifiers::SwitchUsernamePropertyID, user);
-        s->setProperty(ananas::Utils::Identifiers::SwitchPasswordPropertyID, password);
-        return s;
     }
 };
 

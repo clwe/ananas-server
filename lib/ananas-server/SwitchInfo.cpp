@@ -56,56 +56,69 @@ namespace ananas
     }
 
     //==========================================================================
-
-    void SwitchList::handleEdit(const juce::var &data)
+    void SwitchList::setSwitch(const juce::String& id, const juce::String& ip, const juce::String& username, const juce::String& password)
     {
-        const auto *obj{data.getDynamicObject()};
-        if (obj == nullptr) return;
+        if (id.isEmpty()) return;
 
-        // Only broadcast when something actually changed; the change message
-        // round-trips through the value trees and back into this method.
         bool changed{false};
         {
             const juce::ScopedLock sl{lock};
 
-            for (const auto &prop: obj->getProperties()) {
-                if (const auto *s = prop.value.getDynamicObject()) {
-                    if (s->getProperty(Utils::Identifiers::SwitchShouldRemovePropertyID)) {
-                        if (switches.erase(prop.name) > 0) {
-                            std::cout << "Removing " << prop.name.toString() << std::endl;
-                            changed = true;
-                        }
-                        continue;
-                    }
+            // Find the switch, or create it.
+            auto iter{switches.find(id)};
+            if (iter == switches.end()) {
+                iter = switches.insert(std::make_pair(juce::Identifier{id}, SwitchInfo{})).first;
+                std::cout << "Adding " << id << std::endl;
+                changed = true;
+            }
 
-                    auto iter{switches.find(prop.name)};
-                    if (iter == switches.end()) {
-                        iter = switches.insert(std::make_pair(prop.name, SwitchInfo{})).first;
-                        std::cout << "Adding " << iter->first.toString() << std::endl;
-                        changed = true;
-                    }
-
-                    const auto ip{s->getProperty(Utils::Identifiers::SwitchIpPropertyID).toString()};
-                    const auto username{s->getProperty(Utils::Identifiers::SwitchUsernamePropertyID).toString()};
-                    const auto password{s->getProperty(Utils::Identifiers::SwitchPasswordPropertyID).toString()};
-
-                    if (ip != iter->second.ip || username != iter->second.username || password != iter->second.password) {
-                        iter->second.ip = ip;
-                        iter->second.username = username;
-                        iter->second.password = password;
-                        iter->second.lastError = {};
-                        changed = true;
-                    }
-
-                    // Picked up by the switch inspector thread, which clears it.
-                    if (s->getProperty(Utils::Identifiers::SwitchShouldResetPtpPropertyID)) {
-                        iter->second.shouldResetPtp = true;
-                    }
-                }
+            auto &s{iter->second};
+            if (ip != s.ip || username != s.username || password != s.password) {
+                s.ip = ip;
+                s.username = username;
+                s.password = password;
+                // An error from the old settings no longer applies.
+                s.lastError = {};
+                changed = true;
             }
         }
 
         if (changed) sendChangeMessage();
+    }
+
+    void SwitchList::removeSwitch(const juce::String& id)
+    {
+        if (id.isEmpty()) return;
+
+        bool changed{false};
+        {
+            const juce::ScopedLock sl{lock};
+
+            // Find the switch and remove it.
+            auto iter{switches.find(id)};
+            if (iter != switches.end()) {
+                switches.erase(iter);
+                std::cout << "Removing " << id << std::endl;
+                changed = true;
+            }
+        }
+
+        if (changed) sendChangeMessage();
+    }
+
+    void SwitchList::requestPtpReset(const juce::String& id)
+    {
+        if (id.isEmpty()) return;
+
+        {
+            const juce::ScopedLock sl{lock};
+            // Find the switch and set ptp reset request
+            auto iter{switches.find(id)};
+            if (iter != switches.end()) {
+                iter->second.shouldResetPtp = true;
+                std::cout << "Resetting PTP for " << id << std::endl;
+            }
+        }
     }
 
     void SwitchList::handleResponse(const juce::Identifier &switchID, const juce::var &response)

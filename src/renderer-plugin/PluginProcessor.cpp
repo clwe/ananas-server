@@ -37,6 +37,8 @@ PluginProcessor::PluginProcessor()
 
     modulesTree = persistentTree.getOrCreateChildWithName(ananas::Utils::Identifiers::ModulesParamID, nullptr);
 
+    switchesTree = persistentTree.getOrCreateChildWithName(ananas::Utils::Identifiers::SwitchesParamID, nullptr);
+
     updateArrayLayout();
     startTimer(ananas::WFS::Constants::SpeakerPositionResendIntervalMs / 2);
 }
@@ -254,8 +256,7 @@ void PluginProcessor::changeListenerCallback(juce::ChangeBroadcaster *source)
     } else if (const auto *authority = dynamic_cast<ananas::AuthorityInfo *>(source)) {
         dynamicTree.setProperty(ananas::Utils::Identifiers::TimeAuthorityParamID, authority->toVar(), nullptr);
     } else if (const auto *switches = dynamic_cast<ananas::SwitchList *>(source)) {
-        persistentTree.setProperty(ananas::Utils::Identifiers::SwitchesParamID, switches->toVar(), nullptr);
-        dynamicTree.setProperty(ananas::Utils::Identifiers::SwitchesParamID, switches->toVar(), nullptr);
+        switchesTree.copyPropertiesAndChildrenFrom(switches->toValueTree(true), nullptr);
     }
 }
 

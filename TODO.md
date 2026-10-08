@@ -132,20 +132,37 @@ Positions stay on the server; the firmware never stores or hardcodes them.
       existing projects store them as parameters; read them from there once
       when loading.
 
-- [ ] **ValueTree usage.** Data such as the module slots (`Modules`) and
-      switches is stored as one `juce::var` object per property instead of
-      as child nodes. Listeners then only learn that the whole property
-      changed, not which entry, and since the shared object is modified in
-      place, change notifications have to be sent by hand
-      (`sendPropertyChangeMessage`). Use child nodes (e.g. one per module,
-      switch and, later, speaker) so listeners see what changed, and undo
-      becomes possible. A natural fit for the planned `SpeakerLayout`.
+- [x] **ValueTree usage: modules and switches as child nodes.** The
+      processors mirror `ModuleList` and `SwitchList` into `persistentTree`
+      as one `Module` / `Switch` child each (`toValueTree(true)`, with
+      connection and PTP status), and the UI reads those. UI actions call
+      `SwitchList::setSwitch` / `removeSwitch` / `requestPtpReset` directly
+      instead of writing command flags into the tree (`handleEdit` is gone).
+      Use the same pattern for the planned `SpeakerLayout`.
+- [ ] **Remaining command flags and `var` data in the trees.**
+      - The client reboot button still writes `ClientsShouldReboot` into the
+        tree, and the editors forward it to `ClientList::setShouldReboot`.
+        Call it directly from the UI, as for the switches.
+      - The switch inspector thread (`Server.cpp`) still reads the switches
+        through `SwitchList::toVar()`, including the `shouldResetPtp` flag.
+        Give it an entries-based API (like `ModuleList::getEntries()`) and
+        remove `toVar()` and `SwitchShouldResetPtpPropertyID`.
+      - `dynamicTree` still holds the connected clients and the time
+        authority as `var` objects (`ConnectedClients`, `TimeAuthority`).
 - [ ] **`persistentTree` isn't what gets saved.** Despite its name, the
       project state is built separately in `getStateInformation` from the
       parameters plus `ModuleList` / `SwitchList::toValueTree()`;
       `persistentTree` is only the UI's copy. Either save the tree itself
       (one source of truth for user data), or rename it to reflect that it's
       a UI mirror.
+- [x] **Remove `ModuleList::toVar()`.** The renderer plugin uses
+      `toValueTree(true)`, and the Ananas Server plugin no longer listens to
+      the module list (its UI has no module selectors).
+- [ ] **Update the `Modules` and `Switches` nodes in place.** The processors
+      replace all children on every change (`copyPropertiesAndChildrenFrom`),
+      so the UI rebuilds its selectors and the switches table several times
+      per change, and an open drop-down may close. Synchronise instead:
+      update existing children's properties, add or remove only what changed.
 
 - [ ] Authority announcement: check the received packet size, and guard
       `AuthorityInfo` with a lock (written by the listener thread, read by the UI).

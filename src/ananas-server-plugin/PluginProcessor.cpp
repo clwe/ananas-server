@@ -8,8 +8,9 @@ PluginProcessor::PluginProcessor()
       dynamicTree(ananas::Utils::Identifiers::DynamicTreeType),
       persistentTree(ananas::Utils::Identifiers::PersistentTreeType)
 {
+    switchesTree = persistentTree.getOrCreateChildWithName(ananas::Utils::Identifiers::SwitchesParamID, nullptr);
+
     server->getClientList()->addChangeListener(this);
-    server->getModuleList()->addChangeListener(this);
     server->getAuthority()->addChangeListener(this);
     server->getSwitches()->addChangeListener(this);
 }
@@ -17,7 +18,6 @@ PluginProcessor::PluginProcessor()
 PluginProcessor::~PluginProcessor()
 {
     server->getClientList()->removeChangeListener(this);
-    server->getModuleList()->removeChangeListener(this);
     server->getAuthority()->removeChangeListener(this);
     server->getSwitches()->removeChangeListener(this);
 }
@@ -139,13 +139,10 @@ void PluginProcessor::changeListenerCallback(juce::ChangeBroadcaster *source)
 {
     if (const auto *clients = dynamic_cast<ananas::ClientList *>(source)) {
         dynamicTree.setProperty(ananas::Utils::Identifiers::ConnectedClientsParamID, clients->toVar(), nullptr);
-    } else if (const auto *modules = dynamic_cast<ananas::ModuleList *>(source)) {
-        persistentTree.setProperty(ananas::Utils::Identifiers::ModulesParamID, modules->toVar(), nullptr);
     } else if (const auto *authority = dynamic_cast<ananas::AuthorityInfo *>(source)) {
         dynamicTree.setProperty(ananas::Utils::Identifiers::TimeAuthorityParamID, authority->toVar(), nullptr);
     } else if (const auto *switches = dynamic_cast<ananas::SwitchList *>(source)) {
-        persistentTree.setProperty(ananas::Utils::Identifiers::SwitchesParamID, switches->toVar(), nullptr);
-        dynamicTree.setProperty(ananas::Utils::Identifiers::SwitchesParamID, switches->toVar(), nullptr);
+        switchesTree.copyPropertiesAndChildrenFrom(switches->toValueTree(true), nullptr);
     }
 }
 

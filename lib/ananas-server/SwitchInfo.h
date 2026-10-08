@@ -44,7 +44,11 @@ namespace ananas
     class SwitchList final : public juce::ChangeBroadcaster
     {
     public:
-        void handleEdit(const juce::var &data);
+        void setSwitch(const juce::String& id, const juce::String& ip, const juce::String& username, const juce::String& password);
+
+        void removeSwitch(const juce::String& id);
+
+        void requestPtpReset(const juce::String& id);
 
         void handleResponse(const juce::Identifier &switchID, const juce::var &response);
 

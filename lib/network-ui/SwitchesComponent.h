@@ -4,6 +4,7 @@
 #include <AnanasLookAndFeel.h>
 #include <juce_gui_basics/juce_gui_basics.h>
 #include "AnanasNetworkTable.h"
+#include <SwitchInfo.h>
 
 namespace ananas::UI
 {
@@ -12,7 +13,7 @@ namespace ananas::UI
                                     juce::AsyncUpdater
     {
     public:
-        SwitchesComponent(juce::ValueTree &dynamicTreeRef, juce::ValueTree &persistentTreeRef);
+        SwitchesComponent(juce::ValueTree &dynamicTreeRef, juce::ValueTree &persistentTreeRef, SwitchList &switchList);
 
         ~SwitchesComponent() override;
 
@@ -29,9 +30,13 @@ namespace ananas::UI
 
         void resized() override;
 
-        void update(const juce::var &var);
+        void update();
 
         void valueTreePropertyChanged(juce::ValueTree &treeWhosePropertyHasChanged, const juce::Identifier &property) override;
+
+        void valueTreeChildAdded(juce::ValueTree &parentTree, juce::ValueTree &childWhichHasBeenAdded) override;
+
+        void valueTreeChildRemoved(juce::ValueTree &parentTree, juce::ValueTree &childWhichHasBeenRemoved, int indexFromWhichChildWasRemoved) override;
 
         void handleAsyncUpdate() override;
 
@@ -46,7 +51,7 @@ namespace ananas::UI
         public:
             SwitchesTable();
 
-            void update(const juce::var &var);
+            void update(const juce::ValueTree& switchesNode);
 
             int getNumRows() override;
 
@@ -96,8 +101,10 @@ namespace ananas::UI
         juce::Label title;
         juce::TextButton addSwitchButton;
         SwitchesTable switchesTable;
+        SwitchList &switchList;
         juce::ValueTree &dynamicTree;
         juce::ValueTree &persistentTree;
+        juce::ValueTree switchesNode;
     };
 } // ananas::UI
 
