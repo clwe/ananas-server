@@ -67,8 +67,10 @@ namespace ananas
 
         [[nodiscard]] bool getShouldReboot() const;
 
-        void setShouldReboot(bool should);
+        void requestReboot();
 
+        void takeRebootRequest();
+        
         [[nodiscard]] uint getCount() const;
 
         juce::ValueTree toValueTree();

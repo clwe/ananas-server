@@ -7,7 +7,6 @@
 #include "UI/WfsLookAndFeel.h"
 
 class PluginEditor final : public juce::AudioProcessorEditor,
-                           public juce::ValueTree::Listener,
                            public juce::ApplicationCommandTarget
 {
 public:
@@ -18,8 +17,6 @@ public:
     void paint(juce::Graphics &) override;
 
     void resized() override;
-
-    void valueTreePropertyChanged(juce::ValueTree &treeWhosePropertyHasChanged, const juce::Identifier &property) override;
 
     ApplicationCommandTarget *getNextCommandTarget() override;
 

@@ -105,7 +105,6 @@ namespace ananas
 
             inline static const juce::Identifier ConnectedClientsParamID{"ConnectedClients"};
             inline static const juce::Identifier ClientTreeType{"Client"};
-            inline const static juce::Identifier ClientsShouldRebootParamID{"ClientsShouldReboot"};
 
             inline const static juce::Identifier ClientSerialNumberPropertyID{"serialNumber"};
             inline const static juce::Identifier ClientFirmwareTypeVersionPropertyID{"firmwareTypeVersion"};

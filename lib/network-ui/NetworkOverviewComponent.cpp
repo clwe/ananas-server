@@ -2,10 +2,10 @@
 
 namespace ananas::UI {
 
-NetworkOverviewComponent::NetworkOverviewComponent(juce::ValueTree &dynamicTree, juce::ValueTree &persistentTree, SwitchList &switchList)
+NetworkOverviewComponent::NetworkOverviewComponent(juce::ValueTree &dynamicTree, juce::ValueTree &persistentTree, SwitchList &switchList, ClientList &clientList)
     : switches(dynamicTree, persistentTree, switchList),
       timeAuthority(dynamicTree),
-      clientOverview(dynamicTree)
+      clientOverview(dynamicTree, clientList)
 {
     addAndMakeVisible(switches);
     addAndMakeVisible(timeAuthority);

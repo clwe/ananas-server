@@ -629,7 +629,7 @@ namespace ananas::Server
     {
         while (!threadShouldExit()) {
             if (clients.getShouldReboot()) {
-                clients.setShouldReboot(false);
+                clients.takeRebootRequest();
                 socket.write(ip, remotePort, nullptr, 0);
             }
 

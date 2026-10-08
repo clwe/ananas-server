@@ -8,7 +8,8 @@ PluginEditor::PluginEditor(PluginProcessor &p)
       networkOverview(
           getProcessor().getDynamicTree(),
           getProcessor().getPersistentTree(),
-          *getProcessor().getServer().getSwitches()
+          *getProcessor().getServer().getSwitches(),
+          *getProcessor().getServer().getClientList()
       ),
       wfsInterface(
           ananas::WFS::Constants::NumSources,
@@ -43,9 +44,6 @@ PluginEditor::PluginEditor(PluginProcessor &p)
 
     setSize(ananas::UI::Dimensions::UiWidth, ananas::UI::Dimensions::UiHeight);
 
-    getProcessor().getPersistentTree().addListener(this);
-    getProcessor().getDynamicTree().addListener(this);
-
 #if SHOW_NO_NETWORK_OVERLAY
     getProcessor().getServer().addChangeListener(&wfsInterface);
     getProcessor().getServer().addChangeListener(&networkOverview);
@@ -63,9 +61,6 @@ PluginEditor::~PluginEditor()
     juce::Desktop::getInstance().setDefaultLookAndFeel(nullptr);
     setLookAndFeel(nullptr);
 
-    getProcessor().getPersistentTree().removeListener(this);
-    getProcessor().getDynamicTree().removeListener(this);
-
 #if SHOW_NO_NETWORK_OVERLAY
     getProcessor().getServer().removeChangeListener(&wfsInterface);
     getProcessor().getServer().removeChangeListener(&networkOverview);
@@ -81,14 +76,6 @@ void PluginEditor::resized()
 {
     lookAndFeel.setTotalWidth(getWidth());
     tabbedComponent.setBounds(getLocalBounds());
-}
-
-void PluginEditor::valueTreePropertyChanged(juce::ValueTree &treeWhosePropertyHasChanged, const juce::Identifier &property)
-{
-    if (property == ananas::Utils::Identifiers::ClientsShouldRebootParamID) {
-        getProcessor().getServer().getClientList()->setShouldReboot(treeWhosePropertyHasChanged[property]);
-        treeWhosePropertyHasChanged.setPropertyExcludingListener(this, property, false, nullptr);
-    }
 }
 
 juce::ApplicationCommandTarget *PluginEditor::getNextCommandTarget()

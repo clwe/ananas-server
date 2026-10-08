@@ -5,8 +5,7 @@
 #include "PluginProcessor.h"
 #include <NetworkOverviewComponent.h>
 
-class PluginEditor final : public juce::AudioProcessorEditor,
-                           public juce::ValueTree::Listener
+class PluginEditor final : public juce::AudioProcessorEditor
 {
 public:
     explicit PluginEditor(PluginProcessor &);
@@ -16,8 +15,6 @@ public:
     void paint(juce::Graphics &) override;
 
     void resized() override;
-
-    void valueTreePropertyChanged(juce::ValueTree &treeWhosePropertyHasChanged, const juce::Identifier &property) override;
 
 private:
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(PluginEditor)

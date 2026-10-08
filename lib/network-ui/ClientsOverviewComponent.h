@@ -3,6 +3,7 @@
 
 #include <juce_gui_basics/juce_gui_basics.h>
 #include "AnanasNetworkTable.h"
+#include <ClientInfo.h>
 
 namespace ananas::UI
 {
@@ -11,7 +12,7 @@ namespace ananas::UI
                                            juce::AsyncUpdater
     {
     public:
-        explicit ClientsOverviewComponent(juce::ValueTree &dynamicTree);
+        ClientsOverviewComponent(juce::ValueTree &dynamicTree, ClientList &clientListRef);
 
         ~ClientsOverviewComponent() override;
 
@@ -125,6 +126,7 @@ namespace ananas::UI
         OverviewPanel overviewPanel;
         std::unique_ptr<ClientTable> clientTable;
         juce::ValueTree &tree;
+        ClientList &clientList;
     };
 }
 

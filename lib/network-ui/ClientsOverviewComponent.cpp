@@ -4,9 +4,10 @@
 
 namespace ananas::UI
 {
-    ClientsOverviewComponent::ClientsOverviewComponent(juce::ValueTree &dynamicTree)
+    ClientsOverviewComponent::ClientsOverviewComponent(juce::ValueTree &dynamicTree, ClientList &clientListRef)
         : clientTable(std::make_unique<ClientTable>()),
-          tree(dynamicTree)
+          tree(dynamicTree),
+          clientList(clientListRef)
     {
         addAndMakeVisible(title);
         addAndMakeVisible(rebootAllClientsButton);
@@ -75,7 +76,7 @@ namespace ananas::UI
 
     void ClientsOverviewComponent::triggerClientReboot() const
     {
-        tree.setProperty(Utils::Identifiers::ClientsShouldRebootParamID, true, nullptr);
+        clientList.requestReboot();
     }
 
     //==========================================================================
