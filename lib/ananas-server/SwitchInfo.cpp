@@ -19,20 +19,6 @@ namespace ananas
         }
     }
 
-    juce::var SwitchInfo::toVar() const
-    {
-        const auto object{new juce::DynamicObject()};
-
-        object->setProperty(Utils::Identifiers::SwitchIpPropertyID, ip);
-        object->setProperty(Utils::Identifiers::SwitchUsernamePropertyID, username);
-        object->setProperty(Utils::Identifiers::SwitchPasswordPropertyID, password);
-        object->setProperty(Utils::Identifiers::SwitchFreqDriftPropertyId, static_cast<int>(freqDrift));
-        object->setProperty(Utils::Identifiers::SwitchOffsetPropertyId, static_cast<int>(offset));
-        object->setProperty(Utils::Identifiers::SwitchShouldResetPtpPropertyID, shouldResetPtp);
-
-        return object;
-    }
-
     juce::ValueTree SwitchInfo::toValueTree(const bool includeStatus) const
     {
         juce::ValueTree tree(Utils::Identifiers::SwitchTreeType);
@@ -121,6 +107,14 @@ namespace ananas
         }
     }
 
+    bool SwitchList::takePtpResetRequest(const juce::Identifier &id)
+    {
+        const juce::ScopedLock sl{lock};
+        const auto iter{switches.find(id)};
+        if (iter == switches.end()) return false;
+        return std::exchange(iter->second.shouldResetPtp, false);
+    }
+
     void SwitchList::handleResponse(const juce::Identifier &switchID, const juce::var &response)
     {
         {
@@ -139,16 +133,15 @@ namespace ananas
                     std::cerr << "Switch " << iter->second.ip << ": " << error << std::endl;
                     iter->second.lastError = error;
                 }
+                // Nothing the UI shows has changed.
+                return;
+            }
 
-                // Don't keep retrying a failed PTP reset in the background.
-                if (!iter->second.shouldResetPtp) return;
-                iter->second.shouldResetPtp = false;
-            } else if (response.getArray()->isEmpty()) {
+            if (response.getArray()->isEmpty()) {
                 // TODO: maybe don't make this dreadful assumption.
                 //  Thing is, the switch returns an empty JSON array on
                 //  (successful) PTP disable/enable.
                 iter->second.lastError = {};
-                iter->second.shouldResetPtp = false;
             } else {
                 iter->second.lastError = {};
                 const auto switchInfo{response.getArray()->getFirst()};
@@ -159,16 +152,17 @@ namespace ananas
         sendChangeMessage();
     }
 
-    juce::var SwitchList::toVar() const
+    std::vector<SwitchList::Entry> SwitchList::getEntries() const
     {
         const juce::ScopedLock sl{lock};
-        const auto object{new juce::DynamicObject()};
+        std::vector<Entry> entries;
+        entries.reserve(switches.size());
 
-        for (const auto &[identifier, switchInfo]: switches) {
-            object->setProperty(identifier, switchInfo.toVar());
+        for (const auto &[id, s]: switches) {
+            entries.push_back({id, s.ip, s.username, s.password});
         }
 
-        return object;
+        return entries;
     }
 
     juce::ValueTree SwitchList::toValueTree(const bool includeStatus) const

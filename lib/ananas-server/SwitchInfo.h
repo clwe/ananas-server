@@ -12,8 +12,6 @@ namespace ananas
     public:
         void update(const juce::var *response);
 
-        [[nodiscard]] juce::var toVar() const;
-
         [[nodiscard]] juce::ValueTree toValueTree(bool includeStatus = false) const;
 
         static SwitchInfo fromValueTree(const juce::ValueTree& tree);
@@ -44,15 +42,30 @@ namespace ananas
     class SwitchList final : public juce::ChangeBroadcaster
     {
     public:
+        // What the switch inspector needs to query a switch.
+        struct Entry
+        {
+            juce::Identifier id;
+            juce::String ip;
+            juce::String username;
+            juce::String password;
+        };
+
         void setSwitch(const juce::String& id, const juce::String& ip, const juce::String& username, const juce::String& password);
 
         void removeSwitch(const juce::String& id);
 
         void requestPtpReset(const juce::String& id);
 
+        /**
+         * Returns whether a PTP reset was requested for a switch, and clears
+         * the request.
+         */
+        [[nodiscard]] bool takePtpResetRequest(const juce::Identifier &id);
+
         void handleResponse(const juce::Identifier &switchID, const juce::var &response);
 
-        [[nodiscard]] juce::var toVar() const;
+        [[nodiscard]] std::vector<Entry> getEntries() const;
 
         [[nodiscard]] juce::ValueTree toValueTree(bool includeStatus = false) const;
 

@@ -139,13 +139,9 @@ Positions stay on the server; the firmware never stores or hardcodes them.
       `SwitchList::setSwitch` / `removeSwitch` / `requestPtpReset` directly
       instead of writing command flags into the tree (`handleEdit` is gone).
       Use the same pattern for the planned `SpeakerLayout`.
-- [ ] **Remaining command flags and `var` data in the trees.**
-      - The switch inspector thread (`Server.cpp`) still reads the switches
-        through `SwitchList::toVar()`, including the `shouldResetPtp` flag.
-        Give it an entries-based API (like `ModuleList::getEntries()`) and
-        remove `toVar()` and `SwitchShouldResetPtpPropertyID`.
-      - `dynamicTree` still holds the connected clients and the time
-        authority as `var` objects (`ConnectedClients`, `TimeAuthority`).
+- [ ] **Remaining `var` data in the trees.** `dynamicTree` still holds the
+      connected clients and the time authority as `var` objects
+      (`ConnectedClients`, `TimeAuthority`).
 - [ ] **`persistentTree` isn't what gets saved.** Despite its name, the
       project state is built separately in `getStateInformation` from the
       parameters plus `ModuleList` / `SwitchList::toValueTree()`;

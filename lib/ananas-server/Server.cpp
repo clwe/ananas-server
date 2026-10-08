@@ -653,35 +653,24 @@ namespace ananas::Server
         std::cout << getThreadName() <<  " inspecting..." << std::endl << std::flush;
 
         while (!threadShouldExit()) {
-            auto switchesVar{switches.toVar()};
+            for (const auto &s: switches.getEntries()) {
+                // Skip incomplete entries, e.g. a newly added row.
+                if (s.ip.isEmpty() || s.username.isEmpty() || s.password.isEmpty()) continue;
 
-            if (auto *obj = switchesVar.getDynamicObject()) {
-                for (const auto &prop: obj->getProperties()) {
-                    if (const auto *s = prop.value.getDynamicObject()) {
-                        auto ip{s->getProperty(Utils::Identifiers::SwitchIpPropertyID).toString()};
-                        auto username{s->getProperty(Utils::Identifiers::SwitchUsernamePropertyID).toString()};
-                        auto password{s->getProperty(Utils::Identifiers::SwitchPasswordPropertyID).toString()};
-                        const bool shouldResetPtp{s->getProperty(Utils::Identifiers::SwitchShouldResetPtpPropertyID)};
+                juce::var jsonData{new juce::DynamicObject};
+                juce::var response;
 
-                        // Skip incomplete entries, e.g. a newly added row.
-                        if (ip.isEmpty() || username.isEmpty() || password.isEmpty()) continue;
-
-                        juce::var jsonData{new juce::DynamicObject};
-                        juce::var response;
-
-                        if (shouldResetPtp) {
-                            jsonData.getDynamicObject()->setProperty("numbers", "0");
-                            response = curlRequest(ip, username, password, Constants::SwitchDisablePtpPath, juce::JSON::toString(jsonData));
-                            switches.handleResponse(prop.name, response);
-                            response = curlRequest(ip, username, password, Constants::SwitchEnablePtpPath, juce::JSON::toString(jsonData));
-                            switches.handleResponse(prop.name, response);
-                        } else {
-                            jsonData.getDynamicObject()->setProperty("numbers", "0");
-                            jsonData.getDynamicObject()->setProperty("once", "");
-                            response = curlRequest(ip, username, password, Constants::SwitchMonitorPtpPath, juce::JSON::toString(jsonData));
-                            switches.handleResponse(prop.name, response);
-                        }
-                    }
+                if (switches.takePtpResetRequest(s.id)) {
+                    jsonData.getDynamicObject()->setProperty("numbers", "0");
+                    response = curlRequest(s.ip, s.username, s.password, Constants::SwitchDisablePtpPath, juce::JSON::toString(jsonData));
+                    switches.handleResponse(s.id, response);
+                    response = curlRequest(s.ip, s.username, s.password, Constants::SwitchEnablePtpPath, juce::JSON::toString(jsonData));
+                    switches.handleResponse(s.id, response);
+                } else {
+                    jsonData.getDynamicObject()->setProperty("numbers", "0");
+                    jsonData.getDynamicObject()->setProperty("once", "");
+                    response = curlRequest(s.ip, s.username, s.password, Constants::SwitchMonitorPtpPath, juce::JSON::toString(jsonData));
+                    switches.handleResponse(s.id, response);
                 }
             }
 
