@@ -65,12 +65,10 @@ namespace ananas
 
         [[nodiscard]] juce::var toVar() const;
 
-        [[nodiscard]] bool getShouldReboot() const;
-
         void requestReboot();
 
-        void takeRebootRequest();
-        
+        [[nodiscard]] bool takeRebootRequest();
+
         [[nodiscard]] uint getCount() const;
 
         juce::ValueTree toValueTree();

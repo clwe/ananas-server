@@ -140,9 +140,6 @@ Positions stay on the server; the firmware never stores or hardcodes them.
       instead of writing command flags into the tree (`handleEdit` is gone).
       Use the same pattern for the planned `SpeakerLayout`.
 - [ ] **Remaining command flags and `var` data in the trees.**
-      - The client reboot button still writes `ClientsShouldReboot` into the
-        tree, and the editors forward it to `ClientList::setShouldReboot`.
-        Call it directly from the UI, as for the switches.
       - The switch inspector thread (`Server.cpp`) still reads the switches
         through `SwitchList::toVar()`, including the `shouldResetPtp` flag.
         Give it an entries-based API (like `ModuleList::getEntries()`) and

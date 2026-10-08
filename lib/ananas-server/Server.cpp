@@ -628,8 +628,7 @@ namespace ananas::Server
     void Server::RebootSender::runImpl()
     {
         while (!threadShouldExit()) {
-            if (clients.getShouldReboot()) {
-                clients.takeRebootRequest();
+            if (clients.takeRebootRequest()) {
                 socket.write(ip, remotePort, nullptr, 0);
             }
 

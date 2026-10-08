@@ -176,19 +176,14 @@ namespace ananas
         return object;
     }
 
-    bool ClientList::getShouldReboot() const
-    {
-        return shouldReboot;
-    }
-
     void ClientList::requestReboot()
     {
         shouldReboot = true;
     }
 
-    void ClientList::takeRebootRequest()
+    bool ClientList::takeRebootRequest()
     {
-        shouldReboot = false;
+        return shouldReboot.exchange(false);
     }
 
     uint ClientList::getCount() const
