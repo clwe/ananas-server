@@ -40,7 +40,7 @@ target_compile_definitions(ananasRenderer
 
 target_sources(ananasRenderer
         PRIVATE
-        ArrayLayout.cpp
+        RenderLayout.cpp
         PluginEditor.cpp
         PluginProcessor.cpp
         Renderers/WfsRenderer.cpp

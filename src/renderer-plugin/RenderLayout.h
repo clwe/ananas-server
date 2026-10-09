@@ -1,5 +1,5 @@
-#ifndef ARRAYLAYOUT_H
-#define ARRAYLAYOUT_H
+#ifndef RENDERLAYOUT_H
+#define RENDERLAYOUT_H
 
 #include <ClientInfo.h>
 #include <juce_graphics/juce_graphics.h>
@@ -14,9 +14,9 @@ namespace ananas::WFS
      * the slot is empty), and all speakers are spaced evenly. A module's
      * ss/0 is its leftmost speaker.
      */
-    struct ArrayLayout
+    struct RenderLayout
     {
-        static ArrayLayout compute(const std::vector<ModuleList::Entry> &modules, int numSlots, float speakerSpacing);
+        static RenderLayout compute(const std::vector<ModuleList::Entry> &modules, int numSlots, float speakerSpacing);
 
         [[nodiscard]] juce::var toVar() const;
 
@@ -45,4 +45,4 @@ namespace ananas::WFS
     };
 }
 
-#endif //ARRAYLAYOUT_H
+#endif //RENDERLAYOUT_H

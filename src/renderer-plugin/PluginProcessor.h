@@ -7,7 +7,7 @@
 
 #include <Server.h>
 #include <juce_audio_processors/juce_audio_processors.h>
-#include "ArrayLayout.h"
+#include "RenderLayout.h"
 #include "SecondarySourceMessenger.h"
 #include "Renderers/Renderer.h"
 
@@ -103,7 +103,7 @@ private:
      * and speaker spacing, and send any that changed. Also activates each
      * renderer's stream if modules it drives are connected.
      */
-    void updateArrayLayout();
+    void updateRenderLayout();
 
     /**
      * Send speaker positions to connected modules that haven't got them yet.
@@ -135,7 +135,7 @@ private:
 
     juce::HashMap<int, std::atomic<float> *> virtualSourceAmplitudes;
 
-    ananas::WFS::ArrayLayout arrayLayout;
+    ananas::WFS::RenderLayout renderLayout;
 
     struct SentPositions
     {

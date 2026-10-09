@@ -34,7 +34,7 @@ namespace ananas::Ambisonics
 
         void process(const juce::AudioBuffer<float> &input, juce::AudioBuffer<float> &stream) override;
 
-        void layoutChanged(const WFS::ArrayLayout &layout) override;
+        void layoutChanged(const WFS::RenderLayout &layout) override;
 
         void modulesChanged() override;
 

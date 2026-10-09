@@ -45,7 +45,7 @@ Positions stay on the server; the firmware never stores or hardcodes them.
         plausibility problems; notifies listeners (UI, processor) on change.
         This is what the UI edits and the JSON file stores. No network state
         (connection status, firmware type) in it.
-      - `RenderLayout` (read-only struct, today's `ArrayLayout`): computed by
+      - `RenderLayout` (read-only struct, formerly `ArrayLayout`): computed by
         the processor from `SpeakerLayout` + module list (connection status,
         firmware type, output count) + listener position, whenever any of
         them changes. Holds the positions per connected module for `/ss`,

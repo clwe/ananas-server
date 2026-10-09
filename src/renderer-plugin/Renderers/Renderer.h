@@ -2,7 +2,7 @@
 #define RENDERER_H
 
 #include <Server.h>
-#include "../ArrayLayout.h"
+#include "../RenderLayout.h"
 
 namespace ananas::Rendering
 {
@@ -33,7 +33,7 @@ namespace ananas::Rendering
         /**
          * Message thread: the array layout (slots, speaker positions) changed.
          */
-        virtual void layoutChanged(const WFS::ArrayLayout &layout) = 0;
+        virtual void layoutChanged(const WFS::RenderLayout &layout) = 0;
 
         /**
          * Message thread: modules connected, disconnected or changed; resend

@@ -39,7 +39,7 @@ PluginProcessor::PluginProcessor()
 
     switchesTree = persistentTree.getOrCreateChildWithName(ananas::Utils::Identifiers::SwitchesParamID, nullptr);
 
-    updateArrayLayout();
+    updateRenderLayout();
     startTimer(ananas::WFS::Constants::SpeakerPositionResendIntervalMs / 2);
 }
 
@@ -248,7 +248,7 @@ void PluginProcessor::changeListenerCallback(juce::ChangeBroadcaster *source)
     } else if (const auto *modules = dynamic_cast<ananas::ModuleList *>(source)) {
         ananas::Utils::syncChildren(modulesTree, modules->toValueTree(true), ananas::Utils::Identifiers::ModuleIpPropertyID);
 
-        updateArrayLayout();
+        updateRenderLayout();
 
         for (const auto &renderer: renderers) {
             renderer->modulesChanged();
@@ -270,7 +270,7 @@ void PluginProcessor::parameterChanged(const juce::String &parameterID, const fl
 
 void PluginProcessor::handleAsyncUpdate()
 {
-    updateArrayLayout();
+    updateRenderLayout();
 }
 
 void PluginProcessor::timerCallback()
@@ -283,15 +283,15 @@ void PluginProcessor::assignModuleToSlot(const int slot, const juce::String &mod
     server->getModuleList()->assignSlot(slot, moduleIP);
 }
 
-void PluginProcessor::updateArrayLayout()
+void PluginProcessor::updateRenderLayout()
 {
     const auto numSlots{static_cast<int>(apvts.getRawParameterValue(ananas::WFS::Params::NumModules.id)->load())};
     const auto speakerSpacing{apvts.getRawParameterValue(ananas::WFS::Params::SpeakerSpacing.id)->load()};
     const auto modules{server->getModuleList()->getEntries()};
 
-    arrayLayout = ananas::WFS::ArrayLayout::compute(modules, numSlots, speakerSpacing);
+    renderLayout = ananas::WFS::RenderLayout::compute(modules, numSlots, speakerSpacing);
 
-    dynamicTree.setProperty(ananas::WFS::Identifiers::ArrayLayoutParamID, arrayLayout.toVar(), nullptr);
+    dynamicTree.setProperty(ananas::WFS::Identifiers::ArrayLayoutParamID, renderLayout.toVar(), nullptr);
 
     // A renderer's stream is only sent while modules that play it are
     // connected.
@@ -303,7 +303,7 @@ void PluginProcessor::updateArrayLayout()
             })
         };
         server->setStreamActive(i, isNeeded);
-        renderers[i]->layoutChanged(arrayLayout);
+        renderers[i]->layoutChanged(renderLayout);
     }
 
     sendSpeakerPositions(false);
@@ -320,8 +320,8 @@ void PluginProcessor::sendSpeakerPositions(const bool resendUnconfirmed)
             continue;
         }
 
-        const auto desired{arrayLayout.modulePositions.find(ip)};
-        if (desired == arrayLayout.modulePositions.end()) continue;
+        const auto desired{renderLayout.modulePositions.find(ip)};
+        if (desired == renderLayout.modulePositions.end()) continue;
 
         const auto sent{sentSpeakerPositions.find(ip)};
         auto shouldSend{sent == sentSpeakerPositions.end() || sent->second.positions != desired->second};

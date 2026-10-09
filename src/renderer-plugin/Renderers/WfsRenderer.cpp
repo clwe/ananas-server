@@ -45,7 +45,7 @@ namespace ananas::WFS
         }
     }
 
-    void WfsRenderer::layoutChanged(const ArrayLayout &layout)
+    void WfsRenderer::layoutChanged(const RenderLayout &layout)
     {
         // Virtual source x-coordinates are scaled to the array's width.
         if (!juce::approximatelyEqual(layout.outerSpeakerX, outerSpeakerX)) {

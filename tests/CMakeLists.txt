@@ -4,13 +4,13 @@ juce_add_console_app(ananas_tests
 target_sources(ananas_tests
         PRIVATE
         Main.cpp
-        ArrayLayoutTests.cpp
+        RenderLayoutTests.cpp
         ModuleListTests.cpp
         SwitchListTests.cpp
         ValueTreeUtilsTests.cpp
         AmbisonicEncoderTests.cpp
         AmbisonicsRendererTests.cpp
-        ${CMAKE_SOURCE_DIR}/src/renderer-plugin/ArrayLayout.cpp
+        ${CMAKE_SOURCE_DIR}/src/renderer-plugin/RenderLayout.cpp
         ${CMAKE_SOURCE_DIR}/src/renderer-plugin/Renderers/AmbisonicEncoder.cpp
         ${CMAKE_SOURCE_DIR}/src/renderer-plugin/Renderers/AmbisonicsRenderer.cpp
         ${CMAKE_SOURCE_DIR}/src/renderer-plugin/Renderers/AmbisonicsControlMessenger.cpp

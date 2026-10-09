@@ -1,12 +1,12 @@
-#include "ArrayLayout.h"
+#include "RenderLayout.h"
 #include "WFSUtils.h"
 #include <numeric>
 
 namespace ananas::WFS
 {
-    ArrayLayout ArrayLayout::compute(const std::vector<ModuleList::Entry> &modules, const int numSlots, const float speakerSpacing)
+    RenderLayout RenderLayout::compute(const std::vector<ModuleList::Entry> &modules, const int numSlots, const float speakerSpacing)
     {
-        ArrayLayout layout;
+        RenderLayout layout;
 
         // Which module (if any) is in each slot.
         std::vector<const ModuleList::Entry *> slotModules(static_cast<size_t>(juce::jmax(numSlots, 0)), nullptr);
@@ -61,7 +61,7 @@ namespace ananas::WFS
         return layout;
     }
 
-    std::vector<juce::Point<float>> ArrayLayout::getSpeakerPositions(const ::ananas::Utils::FirmwareType firmwareType) const
+    std::vector<juce::Point<float>> RenderLayout::getSpeakerPositions(const ::ananas::Utils::FirmwareType firmwareType) const
     {
         std::vector<juce::Point<float>> positions;
 
@@ -75,7 +75,7 @@ namespace ananas::WFS
         return positions;
     }
 
-    juce::var ArrayLayout::toVar() const
+    juce::var RenderLayout::toVar() const
     {
         const auto object{new juce::DynamicObject()};
 

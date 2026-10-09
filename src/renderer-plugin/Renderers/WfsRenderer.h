@@ -26,7 +26,7 @@ namespace ananas::WFS
 
         void process(const juce::AudioBuffer<float> &input, juce::AudioBuffer<float> &stream) override;
 
-        void layoutChanged(const ArrayLayout &layout) override;
+        void layoutChanged(const RenderLayout &layout) override;
 
         void modulesChanged() override;
 

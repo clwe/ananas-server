@@ -1,4 +1,4 @@
-#include <ArrayLayout.h>
+#include <RenderLayout.h>
 #include <WFSUtils.h>
 
 namespace
@@ -18,18 +18,18 @@ namespace
     bool approximatelyEqual(const float a, const float b) { return std::abs(a - b) < 1e-5f; }
 }
 
-class ArrayLayoutTests final : public juce::UnitTest
+class RenderLayoutTests final : public juce::UnitTest
 {
 public:
-    ArrayLayoutTests() : UnitTest("ArrayLayout", "Renderer") {}
+    RenderLayoutTests() : UnitTest("RenderLayout", "Renderer") {}
 
     void runTest() override
     {
-        using ananas::WFS::ArrayLayout;
+        using ananas::WFS::RenderLayout;
 
         beginTest("All-legacy array matches the original 2-speaker geometry");
         {
-            const auto layout{ArrayLayout::compute({makeModule("a", 0, 2), makeModule("b", 3, 2)}, 8, .2f)};
+            const auto layout{RenderLayout::compute({makeModule("a", 0, 2), makeModule("b", 3, 2)}, 8, .2f)};
             expectEquals(layout.totalNumSpeakers, 16);
             expect(approximatelyEqual(layout.arrayWidth, 3.2f));
             // Previously: (numModules - .5) * spacing.
@@ -41,7 +41,7 @@ public:
 
         beginTest("Slots are as wide as their module");
         {
-            const auto layout{ArrayLayout::compute({makeModule("legacy", 0, 2), makeModule("adau", 1, 16, 8)}, 3, .1f)};
+            const auto layout{RenderLayout::compute({makeModule("legacy", 0, 2), makeModule("adau", 1, 16, 8)}, 3, .1f)};
             expect(layout.slotNumSpeakers == std::vector<int>{2, 16, 2});
             expectEquals(layout.totalNumSpeakers, 20);
             expect(approximatelyEqual(layout.outerSpeakerX, .95f));
@@ -53,19 +53,19 @@ public:
 
         beginTest("Unassigned modules, and slots beyond the number of modules, are at the origin");
         {
-            const auto layout{ArrayLayout::compute({makeModule("free", -1, 16), makeModule("far", 5, 2)}, 3, .1f)};
+            const auto layout{RenderLayout::compute({makeModule("free", -1, 16), makeModule("far", 5, 2)}, 3, .1f)};
             expect(layout.modulePositions.at("free")[15] == juce::Point<float>{});
             expect(layout.modulePositions.at("far")[0] == juce::Point<float>{});
         }
 
         beginTest("Only WFS modules limit the number of rendered sources");
         {
-            const auto wfsOnly{ArrayLayout::compute({makeModule("wfs", 0, 16, 4)}, 2, .1f)};
+            const auto wfsOnly{RenderLayout::compute({makeModule("wfs", 0, 16, 4)}, 2, .1f)};
             expectEquals(wfsOnly.numRenderedSources, 4);
             expectEquals(wfsOnly.numLimitingModules, 1);
 
             // An Ambisonics module's numSources counts Ambisonic channels.
-            const auto mixed{ArrayLayout::compute({
+            const auto mixed{RenderLayout::compute({
                                                       makeModule("wfs", 0, 16, 8),
                                                       makeModule("ambi", 1, 5, 9, ananas::Utils::FirmwareType::ambisonicsModule)
                                                   }, 2, .1f)};
@@ -77,4 +77,4 @@ public:
     }
 };
 
-static ArrayLayoutTests arrayLayoutTests;
+static RenderLayoutTests renderLayoutTests;
