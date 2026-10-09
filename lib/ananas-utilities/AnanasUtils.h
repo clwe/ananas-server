@@ -2,6 +2,7 @@
 #define ANANASUTILS_H
 
 #include <juce_core/juce_core.h>
+#include <juce_data_structures/juce_data_structures.h>
 
 namespace ananas
 {
@@ -148,6 +149,50 @@ namespace ananas
         {
             int disconnectionThresholdMs{};
         };
+
+        // Make target's children match source's, matching children by the
+        // value of the property `propName`. Only what differs is changed, so
+        // listeners only hear about real changes.
+        static void syncChildren(juce::ValueTree &target, const juce::ValueTree &source, const juce::Identifier &propName) 
+        {
+            // Children are matched by this property, so every child needs it.
+            for (const auto &child: source)
+                jassert(child.hasProperty(propName));
+            
+            for (int i = target.getNumChildren() - 1; i >= 0; --i) {
+                const auto targetChild {target.getChild(i)};
+                const auto targetPropVal = targetChild.getProperty(propName);
+                const auto match = source.getChildWithProperty(propName, targetPropVal);
+                if (!match.isValid()) {
+                    // targetChild is not in source anymore, remove it
+                    target.removeChild(i, nullptr);
+                }
+            }
+
+            for (int i = 0; i < source.getNumChildren(); ++i) {
+                const auto sourceChild = source.getChild(i);
+                const auto sourcePropVal = sourceChild.getProperty(propName);
+                auto match = target.getChildWithProperty(propName, sourcePropVal);
+                if (!match.isValid()) {
+                    // sourceChild is not in target yet, add it
+                    target.addChild(sourceChild.createCopy(), i, nullptr);
+                } else {
+                    // sourceChild is in the target already, let's match their properties here
+                    for (int j = sourceChild.getNumProperties() - 1; j >= 0; --j) {
+                        // iterating through matched childrens properties
+                        const auto sourceChildPropName = sourceChild.getPropertyName(j);
+                        const auto sourceChildPropVal = sourceChild.getProperty(sourceChildPropName);
+                        match.setProperty(sourceChildPropName, sourceChildPropVal, nullptr);
+                    }
+                    // check for, and remove dangling properties in the target child
+                    for (int j = match.getNumProperties() - 1; j >= 0; --j) {
+                        const auto name = match.getPropertyName(j);
+                        if (!sourceChild.hasProperty(name))
+                            match.removeProperty(name, nullptr);
+                    }
+                }
+            }
+        }
     };
 }
 

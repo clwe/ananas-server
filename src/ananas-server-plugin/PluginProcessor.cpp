@@ -142,7 +142,7 @@ void PluginProcessor::changeListenerCallback(juce::ChangeBroadcaster *source)
     } else if (const auto *authority = dynamic_cast<ananas::AuthorityInfo *>(source)) {
         dynamicTree.setProperty(ananas::Utils::Identifiers::TimeAuthorityParamID, authority->toVar(), nullptr);
     } else if (const auto *switches = dynamic_cast<ananas::SwitchList *>(source)) {
-        switchesTree.copyPropertiesAndChildrenFrom(switches->toValueTree(true), nullptr);
+        ananas::Utils::syncChildren(switchesTree, switches->toValueTree(true), "identifier");
     }
 }
 
