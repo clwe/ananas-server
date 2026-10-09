@@ -172,7 +172,7 @@ namespace ananas
 
         for (const auto &[identifier, switchInfo]: switches) {
             auto switchTree{switchInfo.toValueTree(includeStatus)};
-            switchTree.setProperty("identifier", identifier.toString(), nullptr);
+            switchTree.setProperty(Utils::Identifiers::SwitchIdentifierPropertyID, identifier.toString(), nullptr);
             tree.addChild(switchTree, -1, nullptr);
         }
 
@@ -189,7 +189,7 @@ namespace ananas
             for (int i{0}; i < tree.getNumChildren(); ++i) {
                 auto switchTree{tree.getChild(i)};
                 if (!switchTree.hasType(Utils::Identifiers::SwitchTreeType)) continue;
-                const auto identifier{switchTree.getProperty("identifier").toString()};
+                const auto identifier{switchTree.getProperty(Utils::Identifiers::SwitchIdentifierPropertyID).toString()};
                 if (identifier.isEmpty()) continue;
                 switches[identifier] = SwitchInfo::fromValueTree(switchTree);
             }

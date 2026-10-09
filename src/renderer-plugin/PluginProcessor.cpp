@@ -246,7 +246,7 @@ void PluginProcessor::changeListenerCallback(juce::ChangeBroadcaster *source)
     if (const auto *clients = dynamic_cast<ananas::ClientList *>(source)) {
         dynamicTree.setProperty(ananas::Utils::Identifiers::ConnectedClientsParamID, clients->toVar(), nullptr);
     } else if (const auto *modules = dynamic_cast<ananas::ModuleList *>(source)) {
-        ananas::Utils::syncChildren(modulesTree, modules->toValueTree(true), "ip");
+        ananas::Utils::syncChildren(modulesTree, modules->toValueTree(true), ananas::Utils::Identifiers::ModuleIpPropertyID);
 
         updateArrayLayout();
 
@@ -256,7 +256,7 @@ void PluginProcessor::changeListenerCallback(juce::ChangeBroadcaster *source)
     } else if (const auto *authority = dynamic_cast<ananas::AuthorityInfo *>(source)) {
         dynamicTree.setProperty(ananas::Utils::Identifiers::TimeAuthorityParamID, authority->toVar(), nullptr);
     } else if (const auto *switches = dynamic_cast<ananas::SwitchList *>(source)) {
-        ananas::Utils::syncChildren(switchesTree, switches->toValueTree(true), "identifier");
+        ananas::Utils::syncChildren(switchesTree, switches->toValueTree(true), ananas::Utils::Identifiers::SwitchIdentifierPropertyID);
     }
 }
 

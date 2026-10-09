@@ -27,7 +27,7 @@ public:
 
         auto withForeignChild{saved.createCopy()};
         juce::ValueTree foreign{"NotASwitch"};
-        foreign.setProperty("identifier", "switch_3", nullptr);
+        foreign.setProperty(ananas::Utils::Identifiers::SwitchIdentifierPropertyID, "switch_3", nullptr);
         withForeignChild.addChild(foreign, -1, nullptr);
 
         ananas::SwitchList filtered;
@@ -48,7 +48,7 @@ public:
         {
             // With status: the child for switch_1 has drift and offset.
             const auto withStatus{list.toValueTree(true)};
-            const auto switch1{withStatus.getChildWithProperty("identifier", "switch_1")};
+            const auto switch1{withStatus.getChildWithProperty(ananas::Utils::Identifiers::SwitchIdentifierPropertyID, "switch_1")};
 
             expect(switch1.isValid());
             expectEquals(static_cast<int>(switch1.getProperty(ananas::Utils::Identifiers::SwitchFreqDriftPropertyId)), 12);
@@ -56,7 +56,7 @@ public:
 
             // Without status (what gets saved): no drift or offset.
             const auto withoutStatus{list.toValueTree()};
-            const auto savedSwitch1{withoutStatus.getChildWithProperty("identifier", "switch_1")};
+            const auto savedSwitch1{withoutStatus.getChildWithProperty(ananas::Utils::Identifiers::SwitchIdentifierPropertyID, "switch_1")};
 
             expect(!savedSwitch1.hasProperty(ananas::Utils::Identifiers::SwitchFreqDriftPropertyId));
             expect(!savedSwitch1.hasProperty(ananas::Utils::Identifiers::SwitchOffsetPropertyId));
@@ -89,8 +89,8 @@ public:
             list.removeSwitch("switch_2");
             const auto tree{list.toValueTree()};
             expectEquals(tree.getNumChildren(), 1);
-            expect(tree.getChildWithProperty("identifier", "switch_1").isValid());
-            expect(!tree.getChildWithProperty("identifier", "switch_2").isValid());
+            expect(tree.getChildWithProperty(ananas::Utils::Identifiers::SwitchIdentifierPropertyID, "switch_1").isValid());
+            expect(!tree.getChildWithProperty(ananas::Utils::Identifiers::SwitchIdentifierPropertyID, "switch_2").isValid());
         }
     }
 };

@@ -127,7 +127,7 @@ namespace ananas::UI
 
     void SwitchesComponent::updateSwitch(const juce::Identifier &switchID, const int col, const juce::String &content) const
     {
-        const auto switchNode{switchesNode.getChildWithProperty("identifier", switchID.toString())};
+        const auto switchNode{switchesNode.getChildWithProperty(Utils::Identifiers::SwitchIdentifierPropertyID, switchID.toString())};
 
         auto ip{switchNode.getProperty(ananas::Utils::Identifiers::SwitchIpPropertyID).toString()};
 
@@ -177,7 +177,7 @@ namespace ananas::UI
             if (!switchNode.hasType(Utils::Identifiers::SwitchTreeType)) continue;
 
             Row row;
-            row.id = switchNode.getProperty("identifier").toString();
+            row.id = switchNode.getProperty(Utils::Identifiers::SwitchIdentifierPropertyID).toString();
             row.ip = switchNode.getProperty(Utils::Identifiers::SwitchIpPropertyID);
             row.username = switchNode.getProperty(Utils::Identifiers::SwitchUsernamePropertyID);
             row.password = switchNode.getProperty(Utils::Identifiers::SwitchPasswordPropertyID);

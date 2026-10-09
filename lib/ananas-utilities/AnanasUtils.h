@@ -78,6 +78,8 @@ namespace ananas
 
             inline const static juce::Identifier SwitchesParamID{"Switches"};
             inline const static juce::Identifier SwitchTreeType{"Switch"};
+            // Key of each Switch child; unique within the list.
+            inline const static juce::Identifier SwitchIdentifierPropertyID{"identifier"};
 
             inline static const juce::Identifier SwitchIdentifierBase{"switch_"};
             inline const static juce::Identifier SwitchIpPropertyID{"switchIP"};
@@ -105,6 +107,7 @@ namespace ananas
 
             inline static const juce::Identifier ConnectedClientsParamID{"ConnectedClients"};
             inline static const juce::Identifier ClientTreeType{"Client"};
+            inline const static juce::Identifier ClientIpPropertyID{"ip"};
 
             inline const static juce::Identifier ClientSerialNumberPropertyID{"serialNumber"};
             inline const static juce::Identifier ClientFirmwareTypeVersionPropertyID{"firmwareTypeVersion"};
@@ -120,6 +123,8 @@ namespace ananas
 
             inline const static juce::Identifier ModulesParamID{"Modules"};
             inline const static juce::Identifier ModuleTreeType{"Module"};
+            // Key of each Module child; unique within the list.
+            inline const static juce::Identifier ModuleIpPropertyID{"ip"};
 
             inline const static juce::Identifier ModuleSlotPropertyID{"ModuleSlot"};
             inline const static juce::Identifier ModuleFirmwareTypePropertyID{"ModuleFirmwareType"};

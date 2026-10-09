@@ -184,7 +184,7 @@ namespace ananas::WFS::UI
         auto hasAmbisonicsModules{false};
 
         for (const auto &module : modulesNode) {
-            const auto ip{module.getProperty("ip").toString()};
+            const auto ip{module.getProperty(ananas::Utils::Identifiers::ModuleIpPropertyID).toString()};
             if (module.getProperty(ananas::Utils::Identifiers::ModuleIsConnectedPropertyID)) {
                 const auto type{static_cast<ananas::Utils::FirmwareType>(static_cast<int>(
                     module.getProperty(ananas::Utils::Identifiers::ModuleFirmwareTypePropertyID)))};
