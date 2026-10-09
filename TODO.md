@@ -31,18 +31,22 @@ Positions stay on the server; the firmware never stores or hardcodes them.
 - [ ] **Layout as data.** One entry per physical speaker: position
       (x, y, z, metres, array frame), orientation (needed by WFS to pick the
       speakers facing a source), and the module output it's connected to
-      (module serial number + output index; the serial rather than the IP).
+      (module IP + output index). The IP identifies a module as reliably as
+      its serial number: the firmware derives both from the Teensy's
+      factory MAC address, so both stay the same across reboots and change
+      together only if the board is replaced. Switch to the serial if module
+      addressing ever changes (e.g. DHCP).
       Optional per speaker: delay, gain, subwoofer flag, "imaginary" (no
       output, for AllRAD).
 - [ ] **Two types: `SpeakerLayout` and `RenderLayout`.**
       - `SpeakerLayout` (class): the editable room description; one entry per
-        speaker (position, orientation, module serial, output). Private data,
+        speaker (position, orientation, module IP, output). Private data,
         changed only through methods that keep it consistent and report
         plausibility problems; notifies listeners (UI, processor) on change.
         This is what the UI edits and the JSON file stores. No network state
-        (IPs, connection status) in it.
+        (connection status, firmware type) in it.
       - `RenderLayout` (read-only struct, today's `ArrayLayout`): computed by
-        the processor from `SpeakerLayout` + module list (serial → IP,
+        the processor from `SpeakerLayout` + module list (connection status,
         firmware type, output count) + listener position, whenever any of
         them changes. Holds the positions per connected module for `/ss`,
         `outerSpeakerX` for WFS source scaling, rmax, the speakers per
@@ -71,7 +75,7 @@ Positions stay on the server; the firmware never stores or hardcodes them.
       `juce::JSON`. Stored separately from projects, since it describes the
       room, not the piece; projects refer to it.
 - [ ] **CSV import and export of the speaker table only** (position,
-      orientation, module serial, output), for editing in spreadsheets and
+      orientation, module IP, output), for editing in spreadsheets and
       importing from design tools. Fixed header row, decimal point, explicit
       separator (German Excel writes `;` and decimal commas).
 - [ ] **Import/export of common formats:** IEM JSON (`LoudspeakerLayout`;
@@ -80,7 +84,7 @@ Positions stay on the server; the firmware never stores or hardcodes them.
       orientation, closest to Ananas). Their azimuth convention (0° front,
       counter-clockwise) matches the encoder's; converting the listener-centred
       spherical formats needs the listener position as reference. None of
-      them can express "module serial, output"; that mapping stays
+      them can express "module IP, output"; that mapping stays
       Ananas-specific.
 - [ ] **Speaker identification:** play noise on one module output at a time,
       to find which physical speaker is wired where. Needs a small firmware
@@ -128,9 +132,7 @@ Positions stay on the server; the firmware never stores or hardcodes them.
       automating them would move every speaker during playback. Store them in
       the saved project state instead (like the slot assignments and
       switches), not automatable. Parameters then only hold what changes
-      during a piece: source positions and the Ambisonics listener. Note that
-      existing projects store them as parameters; read them from there once
-      when loading.
+      during a piece: source positions and the Ambisonics listener.
 
 - [x] **ValueTree usage: modules and switches as child nodes.** The
       processors mirror `ModuleList` and `SwitchList` into `persistentTree`
@@ -151,11 +153,11 @@ Positions stay on the server; the firmware never stores or hardcodes them.
 - [x] **Remove `ModuleList::toVar()`.** The renderer plugin uses
       `toValueTree(true)`, and the Ananas Server plugin no longer listens to
       the module list (its UI has no module selectors).
-- [ ] **Update the `Modules` and `Switches` nodes in place.** The processors
-      replace all children on every change (`copyPropertiesAndChildrenFrom`),
-      so the UI rebuilds its selectors and the switches table several times
-      per change, and an open drop-down may close. Synchronise instead:
-      update existing children's properties, add or remove only what changed.
+- [x] **Update the `Modules` and `Switches` nodes in place.** The processors
+      use `Utils::syncChildren` instead of `copyPropertiesAndChildrenFrom`:
+      children are matched by a key property (`ip`, `identifier`) and only
+      what differs is changed, so an open module drop-down no longer closes
+      when a module announces itself.
 
 - [ ] Authority announcement: check the received packet size, and guard
       `AuthorityInfo` with a lock (written by the listener thread, read by the UI).
