@@ -41,6 +41,8 @@ target_compile_definitions(ananasRenderer
 target_sources(ananasRenderer
         PRIVATE
         RenderLayout.cpp
+        SpeakerLayout.cpp
+        LinearArray.cpp
         PluginEditor.cpp
         PluginProcessor.cpp
         Renderers/WfsRenderer.cpp
