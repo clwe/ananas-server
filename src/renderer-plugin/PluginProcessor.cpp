@@ -1,4 +1,5 @@
 #include "PluginProcessor.h"
+#include "LinearArray.h"
 #include "PluginEditor.h"
 #include "WFSUtils.h"
 #include "Renderers/WfsRenderer.h"
@@ -289,9 +290,21 @@ void PluginProcessor::updateRenderLayout()
     const auto speakerSpacing{apvts.getRawParameterValue(ananas::WFS::Params::SpeakerSpacing.id)->load()};
     const auto modules{server->getModuleList()->getEntries()};
 
-    renderLayout = ananas::WFS::RenderLayout::compute(modules, numSlots, speakerSpacing);
+    const auto linArrSettings = ananas::WFS::settingsFromModuleSlots(modules, numSlots, speakerSpacing);
+    
+    ananas::WFS::LinearArray linArr = ananas::WFS::generateLinearArray(linArrSettings, modules);
 
-    dynamicTree.setProperty(ananas::WFS::Identifiers::ArrayLayoutParamID, renderLayout.toVar(), nullptr);
+    renderLayout = ananas::WFS::RenderLayout::compute(linArr.layout, modules);
+
+    auto layoutVar = renderLayout.toVar();
+    juce::Array<juce::var> slots;
+    for (const auto n: linArr.slotNumSpeakers)
+        slots.add(n);
+
+    layoutVar.getDynamicObject()->setProperty(ananas::WFS::Identifiers::ArraySlotNumSpeakersPropertyID, slots);
+    layoutVar.getDynamicObject()->setProperty(ananas::WFS::Identifiers::ArrayWidthPropertyID, linArr.arrayWidth);
+
+    dynamicTree.setProperty(ananas::WFS::Identifiers::ArrayLayoutParamID, layoutVar, nullptr);
 
     // A renderer's stream is only sent while modules that play it are
     // connected.

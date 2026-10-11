@@ -23,5 +23,6 @@ struct LinearArray
 LinearArray generateLinearArray(const LinearArraySettings &settings,
                                 const std::vector<ModuleList::Entry> &modules);
 
+LinearArraySettings settingsFromModuleSlots(const std::vector<ModuleList::Entry> & modules, int numSlots, float speakerSpacing);
 }
 #endif //LINEARARRAY_H

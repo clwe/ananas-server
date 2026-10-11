@@ -1,63 +1,52 @@
 #include "RenderLayout.h"
 #include "WFSUtils.h"
-#include <numeric>
 
 namespace ananas::WFS
 {
-    RenderLayout RenderLayout::compute(const std::vector<ModuleList::Entry> &modules, const int numSlots, const float speakerSpacing)
+    RenderLayout RenderLayout::compute(const SpeakerLayout& speakerLayout, const std::vector<ModuleList::Entry> &modules)
     {
         RenderLayout layout;
 
-        // Which module (if any) is in each slot.
-        std::vector<const ModuleList::Entry *> slotModules(static_cast<size_t>(juce::jmax(numSlots, 0)), nullptr);
-        for (const auto &m: modules) {
-            if (m.info.slot >= 0 && m.info.slot < numSlots && slotModules[static_cast<size_t>(m.info.slot)] == nullptr) {
-                slotModules[static_cast<size_t>(m.info.slot)] = &m;
-            }
-        }
+        layout.outerSpeakerX = 0.f;
+        for (const auto &s: speakerLayout.getSpeakers())
+            layout.outerSpeakerX = juce::jmax(layout.outerSpeakerX, std::abs(s.position.x));
 
-        for (const auto *m: slotModules) {
-            layout.slotNumSpeakers.push_back(m != nullptr ? m->info.numSpeakers : ananas::Utils::Constants::LegacyNumSpeakers);
-        }
-
-        layout.totalNumSpeakers = std::accumulate(layout.slotNumSpeakers.begin(), layout.slotNumSpeakers.end(), 0);
-        layout.arrayWidth = static_cast<float>(layout.totalNumSpeakers) * speakerSpacing;
-        layout.outerSpeakerX = static_cast<float>(juce::jmax(layout.totalNumSpeakers - 1, 0)) * speakerSpacing / 2.f;
-
+        std::map<juce::String, const ModuleList::Entry*> modulesByIp;
         // Unassigned modules sit at the origin.
         for (const auto &m: modules) {
             layout.modulePositions[m.ip] = std::vector<juce::Point<float>>(static_cast<size_t>(m.info.numSpeakers));
+            modulesByIp[m.ip] = &m;
         }
 
         layout.numRenderedSources = static_cast<int>(Constants::NumSources);
-        auto firstSpeakerIndex{0};
 
-        for (size_t s{0}; s < slotModules.size(); ++s) {
-            const auto numSpeakers{layout.slotNumSpeakers[s]};
+        for (const auto &s: speakerLayout.getSpeakers()) {
+            if (s.moduleIp.isEmpty()) continue; // no module drives it
 
-            if (const auto *m{slotModules[s]}) {
-                layout.assignedModuleTypes[m->ip] = m->info.firmwareType;
-                auto &positions{layout.modulePositions[m->ip]};
-                for (int j{0}; j < numSpeakers; ++j) {
-                    positions[static_cast<size_t>(j)] = {
-                        -layout.outerSpeakerX + static_cast<float>(firstSpeakerIndex + j) * speakerSpacing,
-                        0.f
-                    };
-                }
+            const auto it = layout.modulePositions.find(s.moduleIp);
+            if (it == layout.modulePositions.end()) continue; // module not in the list
+            
+            auto &positions = it->second; // one entry per module output
+            const auto numOutputs = static_cast<int>(positions.size());
+            if (s.output < 0 || s.output >= numOutputs) continue;
 
-                // Only WFS modules render the sources individually; for an
-                // Ambisonics module, numSources counts Ambisonic channels.
-                if (m->info.firmwareType == ananas::Utils::FirmwareType::wfsModule) {
-                    if (m->info.numSources < static_cast<int>(Constants::NumSources)) {
-                        ++layout.numLimitingModules;
-                    }
-                    layout.numRenderedSources = juce::jmin(layout.numRenderedSources, m->info.numSources);
-                }
-            }
-
-            firstSpeakerIndex += numSpeakers;
+            positions[static_cast<size_t>(s.output)] = s.position;
+            layout.assignedModuleTypes[s.moduleIp] = modulesByIp[s.moduleIp]->info.firmwareType;
         }
 
+        // check the maximum possible number of sources that can be rendered for WFS
+        for (const auto &m: modules) {
+            // don't account for modules that are not assigned to any speaker
+            if (layout.assignedModuleTypes.count(m.ip) == 0) continue;
+            // Only WFS modules render the sources individually; for an
+            // Ambisonics module, numSources counts Ambisonic channels.
+            if (m.info.firmwareType == ananas::Utils::FirmwareType::wfsModule) {
+                if (m.info.numSources < static_cast<int>(Constants::NumSources)) {
+                    ++layout.numLimitingModules;
+                }
+                layout.numRenderedSources = juce::jmin(layout.numRenderedSources, m.info.numSources);
+            }
+        }
         return layout;
     }
 
@@ -79,13 +68,6 @@ namespace ananas::WFS
     {
         const auto object{new juce::DynamicObject()};
 
-        juce::Array<juce::var> slots;
-        for (const auto n: slotNumSpeakers) {
-            slots.add(n);
-        }
-
-        object->setProperty(Identifiers::ArraySlotNumSpeakersPropertyID, slots);
-        object->setProperty(Identifiers::ArrayWidthPropertyID, arrayWidth);
         object->setProperty(Identifiers::ArrayOuterSpeakerXPropertyID, outerSpeakerX);
         object->setProperty(Identifiers::ArrayNumRenderedSourcesPropertyID, numRenderedSources);
         object->setProperty(Identifiers::ArrayNumLimitingModulesPropertyID, numLimitingModules);
