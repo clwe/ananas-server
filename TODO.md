@@ -53,8 +53,10 @@ Positions stay on the server; the firmware never stores or hardcodes them.
         technique and the WFS source limit. Passed to all renderers via
         `layoutChanged()`, so they all see one consistent state; they only
         copy finished values (e.g. into atomics for the audio thread).
-      - The linear-array generator becomes a function that creates a
-        `SpeakerLayout`.
+      - Done so far: `RenderLayout::compute` works from a `SpeakerLayout`
+        (minimal for now: position, module IP, output) and the module list;
+        `generateLinearArray` creates one. Still to do: the editable class
+        (methods per speaker, notification, save/load), z and orientation.
 - [ ] **Edit the speaker positions in the UI first**, so they can be checked
       for plausibility before anything is saved: a table (position, z,
       orientation, module, output) next to the top-down view, which shows
@@ -68,6 +70,30 @@ Positions stay on the server; the firmware never stores or hardcodes them.
       is. `/ss` keeps sending
       each module the positions of its outputs; outputs that aren't in the
       layout get none, or are muted.
+      The generator exists (`generateLinearArray`). Still to do: move its
+      settings (number of slots, spacing, module per slot) out of the
+      plugin parameters and `ModuleInfo::slot` into a `LinearArraySetup`
+      owned by the processor, saved with the project.
+- [ ] **A layout made of parts**, e.g. a linear WFS array at the front plus
+      an Ambisonics ring or dome around the listening area. Each part is
+      either a generator with parameters (linear array; later ring, arc,
+      dome) or an explicit list of speakers (edited or imported), and has
+      a placement (offset, later rotation). The `SpeakerLayout` is the
+      speakers of all parts together; `RenderLayout::compute` needs no
+      change. "Linear array only" and "custom only" are layouts with one
+      part.
+      - Generated parts stay parametric, so a linear array keeps adapting
+        to the modules' output counts. They're edited through their
+        parameters; to move single speakers, convert the part to an
+        explicit one (otherwise regenerating would overwrite the edits).
+      - `outerSpeakerX` is currently the largest |x| of all speakers; with
+        more than one part it must only cover the WFS modules' speakers,
+        or the WFS source scaling includes e.g. an Ambisonics ring.
+      - The WFS firmware and `VirtualSourceMessenger` assume the array on
+        y = 0, facing the listener. Keep WFS parts at their default
+        position until speaker orientation (`/ss/<j>/nx|ny`) exists.
+      - A dome needs z in `Speaker` and `/ss/<j>/z` (see protocol
+        extensions below).
 - [ ] **Save and load the edited layout as an Ananas JSON file:** file-wide
       settings (format version, units, coordinate convention, reference
       point) plus the speaker list,
