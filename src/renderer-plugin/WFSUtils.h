@@ -26,6 +26,12 @@ namespace ananas::WFS
         constexpr static int AmbisonicOrder{2};
         constexpr static size_t NumAmbisonicChannels{(AmbisonicOrder + 1) * (AmbisonicOrder + 1)};
         constexpr static size_t MaxNumModules{16};
+        // Linear array: number of module slots and speaker spacing.
+        constexpr static int MinNumSlots{1};
+        constexpr static int DefaultNumSlots{8};
+        constexpr static float MinSpeakerSpacingMetres{.05f};
+        constexpr static float MaxSpeakerSpacingMetres{.3f};
+        constexpr static float DefaultSpeakerSpacingMetres{.2f};
         // TODO: receive min/max y-coordinates from clients?
         constexpr static int MaxYMetres{10};
         constexpr static int MinYMetres{-3};
@@ -78,17 +84,17 @@ namespace ananas::WFS
         inline static const RangedParamInt NumModules{
             "numModules",
             "Number of Modules",
-            1,
+            Constants::MinNumSlots,
             Constants::MaxNumModules,
-            8
+            Constants::DefaultNumSlots
         };
 
         inline static const RangedParamFloat SpeakerSpacing{
             "speakerSpacing",
             "Speaker Spacing (m)",
-            {.05f, .3f, .001f},
-            {.05, .3, .001},
-            .2
+            {Constants::MinSpeakerSpacingMetres, Constants::MaxSpeakerSpacingMetres, .001f},
+            {Constants::MinSpeakerSpacingMetres, Constants::MaxSpeakerSpacingMetres, .001},
+            Constants::DefaultSpeakerSpacingMetres
         };
 
         inline static const BoolParam ShowModuleSelectors{
@@ -210,6 +216,13 @@ namespace ananas::WFS
         inline static const juce::Identifier ArrayOuterSpeakerXPropertyID{"outerSpeakerX"};
         inline static const juce::Identifier ArrayNumRenderedSourcesPropertyID{"numRenderedSources"};
         inline static const juce::Identifier ArrayNumLimitingModulesPropertyID{"numLimitingModules"};
+
+        inline static const juce::Identifier LinearArrayTreeType{"LinearArray"};
+        inline static const juce::Identifier LinearArrayNumSlotsPropertyID{"numSlots"};
+        inline static const juce::Identifier LinearArraySpeakerSpacingPropertyID{"speakerSpacing"};
+        inline static const juce::Identifier LinearArraySlotTreeType{"Slot"};
+        inline static const juce::Identifier LinearArraySlotIndexPropertyID{"index"};
+        inline static const juce::Identifier LinearArraySlotModuleIpPropertyID{"moduleIp"};
     };
 
     class MenuItems

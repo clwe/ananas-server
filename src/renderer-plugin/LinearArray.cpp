@@ -1,4 +1,5 @@
 #include "LinearArray.h"
+#include "WFSUtils.h"
 #include <numeric>
 
 namespace ananas::WFS {
@@ -63,5 +64,121 @@ LinearArraySettings settingsFromModuleSlots(const std::vector<ModuleList::Entry>
         }
     }
     return linArrSettings;
+}
+
+namespace
+{
+    bool operator==(const LinearArraySettings &a, const LinearArraySettings &b)
+    {
+        return a.numSlots == b.numSlots
+               && juce::exactlyEqual(a.speakerSpacing, b.speakerSpacing)
+               && a.slotModuleIps == b.slotModuleIps;
+    }
+}
+
+LinearArraySetup::LinearArraySetup()
+{
+    settings.numSlots = Constants::DefaultNumSlots;
+    settings.speakerSpacing = Constants::DefaultSpeakerSpacingMetres;
+    settings.slotModuleIps.resize(static_cast<size_t>(settings.numSlots));
+}
+
+const LinearArraySettings &LinearArraySetup::getSettings() const
+{
+    return settings;
+}
+
+void LinearArraySetup::setNumSlots(const int numSlots)
+{
+    auto newSettings = settings;
+    newSettings.numSlots = numSlots;
+    apply(std::move(newSettings));
+}
+
+void LinearArraySetup::setSpeakerSpacing(const float spacing)
+{
+    auto newSettings = settings;
+    newSettings.speakerSpacing = spacing;
+    apply(std::move(newSettings));
+}
+
+void LinearArraySetup::assignModule(const int slot, const juce::String &moduleIp)
+{
+    if (slot < 0 || slot >= settings.numSlots) return;
+
+    auto newSettings = settings;
+
+    // A module is in one slot at most: take it out of any other slot first.
+    if (moduleIp.isNotEmpty()) {
+        for (auto &ip: newSettings.slotModuleIps) {
+            if (ip == moduleIp) ip = {};
+        }
+    }
+
+    newSettings.slotModuleIps[static_cast<size_t>(slot)] = moduleIp;
+    apply(std::move(newSettings));
+}
+
+juce::ValueTree LinearArraySetup::toValueTree() const
+{
+    juce::ValueTree tree(Identifiers::LinearArrayTreeType);
+    tree.setProperty(Identifiers::LinearArrayNumSlotsPropertyID, settings.numSlots, nullptr);
+    tree.setProperty(Identifiers::LinearArraySpeakerSpacingPropertyID, settings.speakerSpacing, nullptr);
+
+    for (size_t slot = 0; slot < settings.slotModuleIps.size(); ++slot) {
+        juce::ValueTree slotTree(Identifiers::LinearArraySlotTreeType);
+        slotTree.setProperty(Identifiers::LinearArraySlotIndexPropertyID, static_cast<int>(slot), nullptr);
+        slotTree.setProperty(Identifiers::LinearArraySlotModuleIpPropertyID, settings.slotModuleIps[slot], nullptr);
+        tree.addChild(slotTree, -1, nullptr);
+    }
+
+    return tree;
+}
+
+void LinearArraySetup::fromValueTree(const juce::ValueTree &tree)
+{
+    if (!tree.hasType(Identifiers::LinearArrayTreeType)) return;
+
+    LinearArraySettings newSettings;
+    newSettings.numSlots = tree.getProperty(Identifiers::LinearArrayNumSlotsPropertyID, Constants::DefaultNumSlots);
+    newSettings.speakerSpacing = tree.getProperty(Identifiers::LinearArraySpeakerSpacingPropertyID, Constants::DefaultSpeakerSpacingMetres);
+    newSettings.slotModuleIps.resize(static_cast<size_t>(juce::jmax(newSettings.numSlots, 0)));
+
+    for (const auto &slotTree: tree) {
+        if (!slotTree.hasType(Identifiers::LinearArraySlotTreeType)) continue;
+
+        const int slot = slotTree.getProperty(Identifiers::LinearArraySlotIndexPropertyID, -1);
+        if (slot < 0 || slot >= newSettings.numSlots) continue;
+
+        newSettings.slotModuleIps[static_cast<size_t>(slot)] =
+            slotTree.getProperty(Identifiers::LinearArraySlotModuleIpPropertyID).toString();
+    }
+
+    apply(std::move(newSettings));
+}
+
+void LinearArraySetup::apply(LinearArraySettings newSettings)
+{
+    newSettings.numSlots = juce::jlimit(Constants::MinNumSlots,
+                                        static_cast<int>(Constants::MaxNumModules),
+                                        newSettings.numSlots);
+    newSettings.speakerSpacing = juce::jlimit(Constants::MinSpeakerSpacingMetres,
+                                              Constants::MaxSpeakerSpacingMetres,
+                                              newSettings.speakerSpacing);
+    newSettings.slotModuleIps.resize(static_cast<size_t>(newSettings.numSlots));
+
+    // A module is in one slot at most; the leftmost one wins.
+    for (size_t slot = 0; slot < newSettings.slotModuleIps.size(); ++slot) {
+        const auto &ip = newSettings.slotModuleIps[slot];
+        if (ip.isEmpty()) continue;
+        for (size_t other = slot + 1; other < newSettings.slotModuleIps.size(); ++other) {
+            if (newSettings.slotModuleIps[other] == ip) newSettings.slotModuleIps[other] = {};
+        }
+    }
+
+    if (newSettings == settings) return;
+
+    settings = std::move(newSettings);
+    sendChangeMessage();
 }
 }

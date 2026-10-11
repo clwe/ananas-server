@@ -6,6 +6,7 @@ target_sources(ananas_tests
         Main.cpp
         RenderLayoutTests.cpp
         LinearArrayTests.cpp
+        LinearArraySetupTests.cpp
         ModuleListTests.cpp
         SwitchListTests.cpp
         ValueTreeUtilsTests.cpp
