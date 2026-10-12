@@ -207,6 +207,22 @@ namespace ananas::WFS
         inline static const juce::Identifier LinearArraySlotTreeType{"Slot"};
         inline static const juce::Identifier LinearArraySlotIndexPropertyID{"index"};
         inline static const juce::Identifier LinearArraySlotModuleIpPropertyID{"moduleIp"};
+
+        // The speakers the renderers use, with the problems checkLayout()
+        // found; derived, so mirrored in the dynamic tree.
+        inline static const juce::Identifier SpeakerLayoutTreeType{"SpeakerLayout"};
+        inline static const juce::Identifier SpeakerLayoutModuleProblemsPropertyID{"moduleProblems"};
+        inline static const juce::Identifier SpeakerTreeType{"Speaker"};
+        inline static const juce::Identifier SpeakerIndexPropertyID{"index"};
+        inline static const juce::Identifier SpeakerXPropertyID{"x"};
+        inline static const juce::Identifier SpeakerYPropertyID{"y"};
+        inline static const juce::Identifier SpeakerModuleIpPropertyID{"moduleIp"};
+        inline static const juce::Identifier SpeakerOutputPropertyID{"output"};
+        // Worst LayoutProblem::Severity of the speaker's problems, as an int;
+        // -1 if there are none.
+        inline static const juce::Identifier SpeakerSeverityPropertyID{"severity"};
+        // The descriptions of the speaker's problems, one per line.
+        inline static const juce::Identifier SpeakerProblemsPropertyID{"problems"};
     };
 
     class MenuItems

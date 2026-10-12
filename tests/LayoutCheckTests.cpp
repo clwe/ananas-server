@@ -1,5 +1,6 @@
 #include <LayoutCheck.h>
 #include <LinearArray.h>
+#include <WFSUtils.h>
 
 namespace
 {
@@ -25,6 +26,8 @@ namespace
     {
         return {{.2f * static_cast<float>(position), 0.f}, ip, output};
     }
+
+    bool approximatelyEqual(const float a, const float b) { return std::abs(a - b) < 1e-5f; }
 
     int count(const std::vector<LayoutProblem> &problems, const Type type)
     {
@@ -158,6 +161,35 @@ public:
                 previous = key;
             }
             expect(problems.back().type == Type::outputUnused);
+        }
+
+        beginTest("Tree for the UI: one child per speaker, with its worst severity and its problems");
+        {
+            using ananas::WFS::Identifiers;
+            const auto layout = makeLayout({speaker(0, "a", 0), speaker(1, {}, -1), speaker(2, "gone", 0)});
+            const auto tree = ananas::WFS::toValueTree(layout, checkLayout(layout, {makeModule("a", 2)}));
+
+            expect(tree.hasType(Identifiers::SpeakerLayoutTreeType));
+            expectEquals(tree.getNumChildren(), 3);
+
+            const auto ok = tree.getChild(0);
+            expectEquals(static_cast<int>(ok[Identifiers::SpeakerIndexPropertyID]), 0);
+            expectEquals(ok[Identifiers::SpeakerModuleIpPropertyID].toString(), juce::String{"a"});
+            expectEquals(static_cast<int>(ok[Identifiers::SpeakerOutputPropertyID]), 0);
+            expectEquals(static_cast<int>(ok[Identifiers::SpeakerSeverityPropertyID]), -1);
+            expect(ok[Identifiers::SpeakerProblemsPropertyID].toString().isEmpty());
+
+            const auto noModule = tree.getChild(1);
+            expect(approximatelyEqual(static_cast<float>(noModule[Identifiers::SpeakerXPropertyID]), .2f));
+            expectEquals(static_cast<int>(noModule[Identifiers::SpeakerSeverityPropertyID]),
+                         static_cast<int>(Severity::info));
+            expect(noModule[Identifiers::SpeakerProblemsPropertyID].toString().isNotEmpty());
+
+            expectEquals(static_cast<int>(tree.getChild(2)[Identifiers::SpeakerSeverityPropertyID]),
+                         static_cast<int>(Severity::warning));
+
+            // Module a's output 1 drives no speaker.
+            expect(tree[Identifiers::SpeakerLayoutModuleProblemsPropertyID].toString().contains("output 1"));
         }
     }
 };

@@ -1,4 +1,5 @@
 #include "LayoutCheck.h"
+#include "WFSUtils.h"
 
 namespace ananas::WFS
 {
@@ -104,5 +105,43 @@ namespace ananas::WFS
         });
 
         return problems;
+    }
+
+    juce::ValueTree toValueTree(const SpeakerLayout &layout, const std::vector<LayoutProblem> &problems)
+    {
+        const auto &speakers = layout.getSpeakers();
+
+        // Problems per speaker, and those about modules.
+        std::vector<juce::StringArray> descriptions(speakers.size());
+        std::vector<int> severities(speakers.size(), -1);
+        juce::StringArray moduleProblems;
+
+        for (const auto &p: problems) {
+            if (p.speakerIndex >= 0 && p.speakerIndex < static_cast<int>(speakers.size())) {
+                const auto i = static_cast<size_t>(p.speakerIndex);
+                descriptions[i].add(p.description);
+                severities[i] = juce::jmax(severities[i], static_cast<int>(p.severity));
+            } else {
+                moduleProblems.add(p.description);
+            }
+        }
+
+        juce::ValueTree tree(Identifiers::SpeakerLayoutTreeType);
+        tree.setProperty(Identifiers::SpeakerLayoutModuleProblemsPropertyID, moduleProblems.joinIntoString("\n"), nullptr);
+
+        for (size_t i = 0; i < speakers.size(); ++i) {
+            const auto &s = speakers[i];
+            juce::ValueTree speaker(Identifiers::SpeakerTreeType);
+            speaker.setProperty(Identifiers::SpeakerIndexPropertyID, static_cast<int>(i), nullptr);
+            speaker.setProperty(Identifiers::SpeakerXPropertyID, s.position.x, nullptr);
+            speaker.setProperty(Identifiers::SpeakerYPropertyID, s.position.y, nullptr);
+            speaker.setProperty(Identifiers::SpeakerModuleIpPropertyID, s.moduleIp, nullptr);
+            speaker.setProperty(Identifiers::SpeakerOutputPropertyID, s.output, nullptr);
+            speaker.setProperty(Identifiers::SpeakerSeverityPropertyID, severities[i], nullptr);
+            speaker.setProperty(Identifiers::SpeakerProblemsPropertyID, descriptions[i].joinIntoString("\n"), nullptr);
+            tree.addChild(speaker, -1, nullptr);
+        }
+
+        return tree;
     }
 }

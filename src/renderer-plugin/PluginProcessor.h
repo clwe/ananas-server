@@ -128,6 +128,9 @@ private:
     juce::ValueTree switchesTree;
     // The linear array tree, mirrored for the UI.
     juce::ValueTree linearArrayTree;
+    // The speakers in use and their problems, mirrored into dynamicTree for
+    // the UI.
+    juce::ValueTree speakerLayoutTree;
 
     ananas::WFS::SecondarySourceMessenger secondarySourceMessenger;
 

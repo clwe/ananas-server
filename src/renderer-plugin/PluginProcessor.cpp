@@ -1,5 +1,6 @@
 #include "PluginProcessor.h"
 #include "LinearArray.h"
+#include "LayoutCheck.h"
 #include "PluginEditor.h"
 #include "WFSUtils.h"
 #include "Renderers/WfsRenderer.h"
@@ -44,6 +45,8 @@ PluginProcessor::PluginProcessor()
     modulesTree = persistentTree.getOrCreateChildWithName(ananas::Utils::Identifiers::ModulesParamID, nullptr);
 
     switchesTree = persistentTree.getOrCreateChildWithName(ananas::Utils::Identifiers::SwitchesParamID, nullptr);
+
+    speakerLayoutTree = dynamicTree.getOrCreateChildWithName(ananas::WFS::Identifiers::SpeakerLayoutTreeType, nullptr);
 
     updateRenderLayout();
     startTimer(ananas::WFS::Constants::SpeakerPositionResendIntervalMs / 2);
@@ -306,6 +309,13 @@ void PluginProcessor::updateRenderLayout()
     ananas::WFS::LinearArray linArr = ananas::WFS::generateLinearArray(linArrSettings, modules);
 
     renderLayout = ananas::WFS::RenderLayout::compute(linArr.layout, modules);
+
+    // The speakers and their problems, for the speaker table.
+    const auto speakerLayout = ananas::WFS::toValueTree(linArr.layout, ananas::WFS::checkLayout(linArr.layout, modules));
+    ananas::Utils::syncChildren(speakerLayoutTree, speakerLayout, ananas::WFS::Identifiers::SpeakerIndexPropertyID);
+    speakerLayoutTree.setProperty(ananas::WFS::Identifiers::SpeakerLayoutModuleProblemsPropertyID,
+                                  speakerLayout[ananas::WFS::Identifiers::SpeakerLayoutModuleProblemsPropertyID],
+                                  nullptr);
 
     auto layoutVar = renderLayout.toVar();
     juce::Array<juce::var> slots;

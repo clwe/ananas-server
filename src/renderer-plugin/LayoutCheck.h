@@ -55,6 +55,13 @@ namespace ananas::WFS
      */
     std::vector<LayoutProblem> checkLayout(const SpeakerLayout &layout,
                                            const std::vector<ModuleList::Entry> &modules);
+
+    /**
+     * The speakers and their problems as a tree for the UI: one Speaker child
+     * per speaker (index, position, module, output, worst severity, problem
+     * descriptions), and the module-level problems as a property.
+     */
+    juce::ValueTree toValueTree(const SpeakerLayout &layout, const std::vector<LayoutProblem> &problems);
 }
 
 #endif //LAYOUTCHECK_H
