@@ -13,12 +13,14 @@ namespace ananas::WFS::UI
         juce::ValueTree &persistentTreeToListenTo,
         juce::ValueTree &dynamicTreeToListenTo,
         juce::HashMap<int, std::atomic<float> *> &sourceAmplitudes,
-        ModuleComponent::SelectionCallback onModuleSelectedCallback
+        ModuleComponent::SelectionCallback onModuleSelectedCallback,
+        LinearArraySetup &linArrSetupRef
     ) : state(apvts),
         xyController(numSources, apvts, sourceAmplitudes),
         persistentTree(persistentTreeToListenTo),
         dynamicTree(dynamicTreeToListenTo),
-        onModuleSelected(std::move(onModuleSelectedCallback))
+        onModuleSelected(std::move(onModuleSelectedCallback)),
+        linearArraySetup(linArrSetupRef)
     {
         // Display the XY-controller
         addAndMakeVisible(xyController);
@@ -26,43 +28,46 @@ namespace ananas::WFS::UI
         // Display and attach the number-of-modules selector.
         addAndMakeVisible(numModulesLabel);
         numModulesLabel.attachToComponent(&numModulesSelector, true);
-        numModulesLabel.setText(Params::NumModules.name, juce::dontSendNotification);
+        numModulesLabel.setText("Number of Modules", juce::dontSendNotification);
         numModulesLabel.setJustificationType(juce::Justification::centredRight);
 
         addAndMakeVisible(numModulesSelector);
-        for (size_t n{0}; n < Constants::MaxNumModules; ++n) {
+        for (int n = 0; n < static_cast<int>(Constants::MaxNumModules); ++n) {
             numModulesSelector.addItem(juce::String{n + 1}, n + 1);
         }
 
-        numModulesAttachment = std::make_unique<juce::AudioProcessorValueTreeState::ComboBoxAttachment>(
-            state,
-            Params::NumModules.id,
-            numModulesSelector
-        );
+        // Show the current value first, without triggering onChange...
+        numModulesSelector.setSelectedId(linearArraySetup.getSettings().numSlots, juce::dontSendNotification);
 
-        // Display and attach the speaker spacing selector.
+        // ...then pass the user's choices to the setup.
+        numModulesSelector.onChange = [this]
+        {
+            linearArraySetup.setNumSlots(numModulesSelector.getSelectedId());
+        };
+
+        // Display the speaker spacing selector.
         addAndMakeVisible(speakerSpacingLabel);
         speakerSpacingLabel.attachToComponent(&speakerSpacingSlider, true);
-        speakerSpacingLabel.setText(Params::SpeakerSpacing.name, juce::dontSendNotification);
+        speakerSpacingLabel.setText("Speaker Spacing [m]", juce::dontSendNotification);
         speakerSpacingLabel.setJustificationType(juce::Justification::centredRight);
 
         addAndMakeVisible(speakerSpacingSlider);
         speakerSpacingSlider.setSliderStyle(juce::Slider::SliderStyle::IncDecButtons);
-        speakerSpacingSlider.setNormalisableRange(Params::SpeakerSpacing.rangeDouble);
-        speakerSpacingSlider.setValue(Params::SpeakerSpacing.defaultValue);
+        speakerSpacingSlider.setNormalisableRange({Constants::MinSpeakerSpacingMetres, Constants::MaxSpeakerSpacingMetres, .001});
+        speakerSpacingSlider.setValue(linearArraySetup.getSettings().speakerSpacing, juce::dontSendNotification);
+
         speakerSpacingSlider.setTextBoxStyle(juce::Slider::TextBoxLeft,
                                              false,
                                              speakerSpacingSlider.getTextBoxWidth(),
                                              25);
         speakerSpacingSlider.setIncDecButtonsMode(juce::Slider::incDecButtonsDraggable_Vertical);
 
-        speakerSpacingAttachment = std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment>(
-            state,
-            Params::SpeakerSpacing.id,
-            speakerSpacingSlider
-        );
+        speakerSpacingSlider.onValueChange = [this]
+        {
+            linearArraySetup.setSpeakerSpacing(static_cast<float>(speakerSpacingSlider.getValue()));
+        };
 
-        // Display and attach the show-module-selectors checkbox.
+        // Display and attach the show-module-selectors checkbox
         addAndMakeVisible(showModuleSelectorsButton);
         showModuleSelectorsButton.setButtonText(Params::ShowModuleSelectors.name);
 
@@ -291,16 +296,23 @@ namespace ananas::WFS::UI
         } else if (property == Identifiers::ArrayLayoutParamID) {
             updateArrayLayout(treeWhosePropertyHasChanged[property]);
         }
+        if (treeWhosePropertyHasChanged == linearArrayNode) {
+            if (property == Identifiers::LinearArrayNumSlotsPropertyID) {
+                numModulesSelector.setSelectedId(treeWhosePropertyHasChanged[property], juce::dontSendNotification);
+            } else if (property == Identifiers::LinearArraySpeakerSpacingPropertyID) {
+                speakerSpacingSlider.setValue(treeWhosePropertyHasChanged[property], juce::dontSendNotification);
+            }
+        }
     }
 
-    void WFSInterfaceComponent::valueTreeChildAdded(juce::ValueTree &parentTree, juce::ValueTree &) 
+    void WFSInterfaceComponent::valueTreeChildAdded(juce::ValueTree &parentTree, juce::ValueTree &)
     {
         if (parentTree == modulesNode || parentTree == linearArrayNode) {
             updateModuleLists();
         }
     }
 
-    void WFSInterfaceComponent::valueTreeChildRemoved(juce::ValueTree &parentTree, juce::ValueTree &, int) 
+    void WFSInterfaceComponent::valueTreeChildRemoved(juce::ValueTree &parentTree, juce::ValueTree &, int)
     {
         if (parentTree == modulesNode || parentTree == linearArrayNode) {
             updateModuleLists();

@@ -59,10 +59,6 @@ namespace ananas::WFS
 
     void VirtualSourceMessenger::parameterChanged(const juce::String &parameterID, float newValue)
     {
-        if (parameterID == Params::SpeakerSpacing.id) {
-            return;
-        }
-
         // Scale the virtual source co-ordinate to soundfield dimensions...
         if (parameterID.endsWith("x")) {
             newValue = Params::positionXToMetres(newValue, outerSpeakerX.load());

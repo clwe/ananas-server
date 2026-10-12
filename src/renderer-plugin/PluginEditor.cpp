@@ -20,7 +20,8 @@ PluginEditor::PluginEditor(PluginProcessor &p)
           [this](const int slot, const juce::String &moduleIP)
           {
               getProcessor().assignModuleToSlot(slot, moduleIP);
-          }
+          },
+          getProcessor().getLinearArraySetup()
       )
 {
     juce::Desktop::getInstance().setDefaultLookAndFeel(&lookAndFeel);

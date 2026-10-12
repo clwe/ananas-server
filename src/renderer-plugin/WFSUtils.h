@@ -81,22 +81,6 @@ namespace ananas::WFS
             bool defaultValue{true};
         };
 
-        inline static const RangedParamInt NumModules{
-            "numModules",
-            "Number of Modules",
-            Constants::MinNumSlots,
-            Constants::MaxNumModules,
-            Constants::DefaultNumSlots
-        };
-
-        inline static const RangedParamFloat SpeakerSpacing{
-            "speakerSpacing",
-            "Speaker Spacing (m)",
-            {Constants::MinSpeakerSpacingMetres, Constants::MaxSpeakerSpacingMetres, .001f},
-            {Constants::MinSpeakerSpacingMetres, Constants::MaxSpeakerSpacingMetres, .001},
-            Constants::DefaultSpeakerSpacingMetres
-        };
-
         inline static const BoolParam ShowModuleSelectors{
             "showModuleSelectors",
             "Show module selectors",

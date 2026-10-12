@@ -32,12 +32,10 @@ PluginProcessor::PluginProcessor()
 
     linearArrayTree = persistentTree.getOrCreateChildWithName(ananas::WFS::Identifiers::LinearArrayTreeType, nullptr);
 
-    passParametersToSetup();
     updateLinearArrayTree();
 
     linearArraySetup.addChangeListener(this);
-    apvts.addParameterListener(ananas::WFS::Params::NumModules.id, this);
-    apvts.addParameterListener(ananas::WFS::Params::SpeakerSpacing.id, this);
+
     for (uint n{0}; n < ananas::WFS::Constants::NumSources; ++n) {
         // Set up source amplitudes for visualisation.
         virtualSourceAmplitudes.set(static_cast<int>(n), new std::atomic{0.f});
@@ -58,10 +56,7 @@ PluginProcessor::~PluginProcessor()
     server->getAuthority()->removeChangeListener(this);
     server->getSwitches()->removeChangeListener(this);
     linearArraySetup.removeChangeListener(this);
-    apvts.removeParameterListener(ananas::WFS::Params::NumModules.id, this);
-    apvts.removeParameterListener(ananas::WFS::Params::SpeakerSpacing.id, this);
     stopTimer();
-    cancelPendingUpdate();
 }
 
 void PluginProcessor::prepareToPlay(const double sampleRate, const int samplesPerBlock)
@@ -279,37 +274,22 @@ void PluginProcessor::changeListenerCallback(juce::ChangeBroadcaster *source)
     }
 }
 
-void PluginProcessor::updateLinearArrayTree() {
+void PluginProcessor::updateLinearArrayTree()
+{
     ananas::Utils::syncChildren(linearArrayTree, linearArraySetup.toValueTree(), ananas::WFS::Identifiers::LinearArraySlotIndexPropertyID);
     linearArrayTree.setProperty(ananas::WFS::Identifiers::LinearArrayNumSlotsPropertyID, linearArraySetup.getSettings().numSlots, nullptr);
     linearArrayTree.setProperty(ananas::WFS::Identifiers::LinearArraySpeakerSpacingPropertyID, linearArraySetup.getSettings().speakerSpacing, nullptr);
 }
 
-void PluginProcessor::parameterChanged(const juce::String &parameterID, const float newValue)
+ananas::WFS::LinearArraySetup& PluginProcessor::getLinearArraySetup()
 {
-    juce::ignoreUnused(parameterID, newValue);
-
-    // May be called from the audio thread; update the layout on the message thread.
-    triggerAsyncUpdate();
+    return linearArraySetup;
 }
 
-void PluginProcessor::handleAsyncUpdate()
-{
-    passParametersToSetup();
-}
 
 void PluginProcessor::timerCallback()
 {
     sendSpeakerPositions(true);
-}
-
-void PluginProcessor::passParametersToSetup()
-{
-    const auto numSlots{static_cast<int>(apvts.getRawParameterValue(ananas::WFS::Params::NumModules.id)->load())};
-    const auto speakerSpacing{apvts.getRawParameterValue(ananas::WFS::Params::SpeakerSpacing.id)->load()};
-
-    linearArraySetup.setNumSlots(numSlots);
-    linearArraySetup.setSpeakerSpacing(speakerSpacing);
 }
 
 void PluginProcessor::assignModuleToSlot(const int slot, const juce::String &moduleIP)
@@ -460,21 +440,6 @@ juce::AudioProcessor::BusesProperties PluginProcessor::getBusesProperties(const 
 juce::AudioProcessorValueTreeState::ParameterLayout PluginProcessor::createParameterLayout()
 {
     juce::AudioProcessorValueTreeState::ParameterLayout params{};
-
-    params.add(std::make_unique<juce::AudioParameterInt>(
-        ananas::WFS::Params::NumModules.id,
-        ananas::WFS::Params::NumModules.name,
-        ananas::WFS::Params::NumModules.minValue,
-        ananas::WFS::Params::NumModules.maxValue,
-        ananas::WFS::Params::NumModules.defaultValue
-    ));
-
-    params.add(std::make_unique<juce::AudioParameterFloat>(
-        ananas::WFS::Params::SpeakerSpacing.id,
-        ananas::WFS::Params::SpeakerSpacing.name,
-        ananas::WFS::Params::SpeakerSpacing.range,
-        ananas::WFS::Params::SpeakerSpacing.defaultValue
-    ));
 
     params.add(std::make_unique<juce::AudioParameterFloat>(
         ananas::WFS::Params::ListenerX.id,

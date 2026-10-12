@@ -5,6 +5,7 @@
 #include "ModuleComponent.h"
 #include "SpeakerIconComponent.h"
 #include "XYControllerComponent.h"
+#include "../LinearArray.h"
 #if SHOW_NO_NETWORK_OVERLAY
 #include <OverlayableComponent.h>
 #endif
@@ -26,7 +27,8 @@ namespace ananas::WFS::UI
                               juce::ValueTree &persistentTreeToListenTo,
                               juce::ValueTree &dynamicTreeToListenTo,
                               juce::HashMap<int, std::atomic<float> *> &sourceAmplitudes,
-                              ModuleComponent::SelectionCallback onModuleSelected);
+                              ModuleComponent::SelectionCallback onModuleSelected,
+                              LinearArraySetup& linArrSetupRef);
 
         ~WFSInterfaceComponent() override;
 
@@ -57,12 +59,10 @@ namespace ananas::WFS::UI
         juce::OwnedArray<SpeakerIconComponent> speakerIcons;
         juce::ComboBox numModulesSelector;
         juce::Label numModulesLabel;
-        std::unique_ptr<juce::AudioProcessorValueTreeState::ComboBoxAttachment> numModulesAttachment;
-        juce::Slider speakerSpacingSlider;
-        juce::Label speakerSpacingLabel;
-        std::unique_ptr<juce::AudioProcessorValueTreeState::SliderAttachment> speakerSpacingAttachment;
         juce::ToggleButton showModuleSelectorsButton;
         std::unique_ptr<juce::AudioProcessorValueTreeState::ButtonAttachment> showModuleSelectorsAttachment;
+        juce::Slider speakerSpacingSlider;
+        juce::Label speakerSpacingLabel;
         juce::Label arrayWarningLabel;
         // Shown while Ambisonics modules are connected.
         juce::ComboBox ambisonicsInputSelector;
@@ -75,6 +75,7 @@ namespace ananas::WFS::UI
         ModuleComponent::SelectionCallback onModuleSelected;
         // Number of speakers in each module slot.
         std::vector<int> slotNumSpeakers;
+        LinearArraySetup &linearArraySetup;
     };
 } // ananas::WFS
 

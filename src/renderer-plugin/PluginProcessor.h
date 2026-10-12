@@ -14,9 +14,7 @@
 
 class PluginProcessor final : public juce::AudioProcessor,
                               public juce::ChangeListener,
-                              public juce::AudioProcessorValueTreeState::Listener,
-                              juce::AsyncUpdater,
-                              juce::Timer
+                              public juce::Timer
 {
 public:
     PluginProcessor();
@@ -61,8 +59,6 @@ public:
 
     void changeListenerCallback(juce::ChangeBroadcaster *source) override;
 
-    void parameterChanged(const juce::String &parameterID, float newValue) override;
-
     /**
      * Put a module in an array slot; an empty IP clears the slot.
      */
@@ -84,6 +80,9 @@ public:
 
     juce::HashMap<int, std::atomic<float> *> &getSourceAmplitudes();
 
+    // get the linear array for the UI
+    [[nodiscard]] ananas::WFS::LinearArraySetup& getLinearArraySetup();
+
 private:
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(PluginProcessor)
 
@@ -94,8 +93,6 @@ private:
     static void removeChildrenWithType(juce::ValueTree &tree, const juce::Identifier &type);
 
     BusesProperties getBusesProperties(size_t numChannels);
-
-    void handleAsyncUpdate() override;
 
     void timerCallback() override;
 
@@ -112,10 +109,6 @@ private:
      * don't echo the positions sent.
      */
     void sendSpeakerPositions(bool resendUnconfirmed);
-
-    // Until the number of slots and the spacing stop being parameters:
-    // passes their values into the linear-array setup.
-    void passParametersToSetup();
 
     void updateLinearArrayTree();
 

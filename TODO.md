@@ -64,16 +64,15 @@ Positions stay on the server; the firmware never stores or hardcodes them.
       Point out what looks wrong: speakers at the same position, a module
       output used twice or not at all, speakers facing away from the
       listening area, and a listener or sources placed where the layout
-      can't render them. Saving to a file comes afterwards (below).
-- [ ] **The current linear array becomes a generator** ("N modules, spacing
+      can't render them. Outputs without a speaker must be muted (needs the
+      protocol extension below). Saving to a file comes afterwards (below).
+- [x] **The current linear array becomes a generator** ("N modules, spacing
       d") that produces a `SpeakerLayout`, so the WFS workflow stays as it
-      is. `/ss` keeps sending
-      each module the positions of its outputs; outputs that aren't in the
-      layout get none, or are muted.
-      The generator exists (`generateLinearArray`). Still to do: move its
-      settings (number of slots, spacing, module per slot) out of the
-      plugin parameters and `ModuleInfo::slot` into a `LinearArraySetup`
-      owned by the processor, saved with the project.
+      is. `/ss` keeps sending each module the positions of its outputs.
+      `generateLinearArray` creates the `SpeakerLayout` from the
+      settings in `LinearArraySetup` (number of slots, spacing, module per
+      slot), which the processor owns and saves with the project. The
+      module list only holds what modules report.
 - [ ] **A layout made of parts**, e.g. a linear WFS array at the front plus
       an Ambisonics ring or dome around the listening area. Each part is
       either a generator with parameters (linear array; later ring, arc,
@@ -118,6 +117,16 @@ Positions stay on the server; the firmware never stores or hardcodes them.
       outputs.
 - [ ] **Protocol extensions:** `/ss/<j>/z` for elevated speakers, and
       `/ss/<j>/nx|ny` (orientation) for WFS on non-linear layouts.
+      - **Mute outputs that no speaker uses.** Today they get the position
+        (0, 0), which modules render as a speaker at the origin; not
+        sending a position isn't safe either, since modules keep whatever
+        position they have. Needs a message such as `/ss/<j>/mute 0|1`, or
+        a gain per output (see `/levelout` under Ambisonics), handled by
+        both module types and included in the echo check, so it's resent
+        after a reboot (firmware handover). Server side:
+        `RenderLayout::compute` records the unused outputs per module, and
+        `sendSpeakerPositions` sends the mute. Only matters once layouts
+        can be edited; with the linear array every output has a speaker.
 
 ## Ambisonics
 
@@ -152,13 +161,19 @@ Positions stay on the server; the firmware never stores or hardcodes them.
 
 ## Robustness and cleanup
 
-- [ ] **Move setup values out of the plugin parameters.** The number of
-      modules (`numModules`) and the speaker spacing (`speakerSpacing`) are
-      host-automatable parameters, although they describe the hardware, and
-      automating them would move every speaker during playback. Store them in
-      the saved project state instead (like the slot assignments and
-      switches), not automatable. Parameters then only hold what changes
-      during a piece: source positions and the Ambisonics listener.
+- [x] **Move setup values out of the plugin parameters.** The number of
+      slots and the speaker spacing are no longer host-automatable
+      parameters; together with the module per slot they live in
+      `LinearArraySetup`, saved with the project. Parameters now only hold
+      what changes during a piece: source positions and the Ambisonics
+      listener (plus the UI settings below).
+- [ ] **Move UI settings out of the plugin parameters as well.**
+      `showModuleSelectors` (whether the slot selectors are visible) is a
+      host-automatable parameter, but it's a view setting, not something
+      to automate during a piece. Store it as plain saved state instead
+      (or per editor). Check the Ambisonics input mode the same way: it
+      selects where the Ambisonics stream comes from, which is more setup
+      than performance.
 
 - [x] **ValueTree usage: modules and switches as child nodes.** The
       processors mirror `ModuleList` and `SwitchList` into `persistentTree`
