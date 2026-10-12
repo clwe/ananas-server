@@ -126,7 +126,6 @@ namespace ananas
             // Key of each Module child; unique within the list.
             inline const static juce::Identifier ModuleIpPropertyID{"ip"};
 
-            inline const static juce::Identifier ModuleSlotPropertyID{"ModuleSlot"};
             inline const static juce::Identifier ModuleFirmwareTypePropertyID{"ModuleFirmwareType"};
             inline const static juce::Identifier ModuleNumSourcesPropertyID{"ModuleNumSources"};
             inline const static juce::Identifier ModuleNumSpeakersPropertyID{"ModuleNumSpeakers"};

@@ -49,7 +49,6 @@ namespace ananas
     juce::ValueTree ModuleInfo::toValueTree() const
     {
         juce::ValueTree tree{Utils::Identifiers::ModuleTreeType};
-        tree.setProperty(Utils::Identifiers::ModuleSlotPropertyID, slot, nullptr);
         tree.setProperty(Utils::Identifiers::ModuleFirmwareTypePropertyID, static_cast<int>(firmwareType), nullptr);
         tree.setProperty(Utils::Identifiers::ModuleNumSourcesPropertyID, numSources, nullptr);
         tree.setProperty(Utils::Identifiers::ModuleNumSpeakersPropertyID, numSpeakers, nullptr);
@@ -85,10 +84,7 @@ namespace ananas
 
     ModuleInfo ModuleInfo::fromValueTree(const juce::ValueTree &tree)
     {
-        // Projects saved by older versions have no slot; those modules start
-        // unassigned.
         ModuleInfo info;
-        info.slot = tree.getProperty(Utils::Identifiers::ModuleSlotPropertyID, -1);
         info.firmwareType = static_cast<Utils::FirmwareType>(static_cast<int>(
             tree.getProperty(Utils::Identifiers::ModuleFirmwareTypePropertyID, static_cast<int>(Utils::FirmwareType::wfsModule))));
         info.numSources = tree.getProperty(Utils::Identifiers::ModuleNumSourcesPropertyID, Utils::Constants::LegacyNumSources);
@@ -274,24 +270,6 @@ namespace ananas
     void ModuleList::timerCallback()
     {
         checkConnectivity();
-    }
-
-    void ModuleList::assignSlot(const int slot, const juce::String &moduleIP)
-    {
-        bool changed{false};
-        {
-            const juce::ScopedLock sl{lock};
-
-            for (auto &[ip, m]: modules) {
-                const auto newSlot{ip == moduleIP ? slot : (m.slot == slot ? -1 : m.slot)};
-                if (newSlot != m.slot) {
-                    m.slot = newSlot;
-                    changed = true;
-                }
-            }
-        }
-
-        if (changed) sendChangeMessage();
     }
 
     std::vector<ModuleList::Entry> ModuleList::getEntries() const

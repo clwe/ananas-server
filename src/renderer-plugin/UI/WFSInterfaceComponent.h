@@ -70,6 +70,8 @@ namespace ananas::WFS::UI
         juce::ValueTree &persistentTree;
         juce::ValueTree &dynamicTree;
         juce::ValueTree modulesNode;
+        // The linear-array setup (module per slot), mirrored by the processor.
+        juce::ValueTree linearArrayNode;
         ModuleComponent::SelectionCallback onModuleSelected;
         // Number of speakers in each module slot.
         std::vector<int> slotNumSpeakers;

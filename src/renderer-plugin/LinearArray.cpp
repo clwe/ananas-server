@@ -48,24 +48,6 @@ LinearArray generateLinearArray(const LinearArraySettings &settings, const std::
     return array;
 }
 
-LinearArraySettings settingsFromModuleSlots(const std::vector<ModuleList::Entry> & modules, int numSlots, float speakerSpacing)
-{
-    LinearArraySettings linArrSettings;
-    linArrSettings.numSlots = numSlots;
-    linArrSettings.speakerSpacing = speakerSpacing;
-
-    linArrSettings.slotModuleIps.resize(static_cast<size_t>(juce::jmax(numSlots, 0)));
-
-    for (const auto& m : modules) {
-        if(m.info.slot >= 0 && m.info.slot < numSlots) {
-            const auto slotIndex = static_cast<size_t>(m.info.slot);
-            if(linArrSettings.slotModuleIps[slotIndex].isEmpty())
-                linArrSettings.slotModuleIps[slotIndex] = m.ip;
-        }
-    }
-    return linArrSettings;
-}
-
 namespace
 {
     bool operator==(const LinearArraySettings &a, const LinearArraySettings &b)

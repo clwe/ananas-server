@@ -36,8 +36,6 @@ namespace ananas
 
         static ModuleInfo fromValueTree(const juce::ValueTree &tree);
 
-        // Position of the module in the array; -1 if unassigned.
-        int slot{-1};
         // Which rendering technique the module's firmware implements.
         Utils::FirmwareType firmwareType{Utils::FirmwareType::wfsModule};
         // Virtual sources (WFS) or Ambisonic channels (Ambisonics) this module
@@ -98,12 +96,6 @@ namespace ananas
         void handlePacket(const juce::String &moduleIP, const ClientAnnouncePacket &packet);
 
         void timerCallback() override;
-
-        /**
-         * Put a module in an array slot. Any module already in that slot is
-         * unassigned. An empty IP just clears the slot.
-         */
-        void assignSlot(int slot, const juce::String &moduleIP);
 
         [[nodiscard]] std::vector<Entry> getEntries() const;
 

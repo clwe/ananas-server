@@ -98,6 +98,7 @@ namespace ananas::WFS::UI
 
         // get the modules node
         modulesNode = persistentTree.getChildWithName(ananas::Utils::Identifiers::ModulesParamID);
+        linearArrayNode = persistentTree.getChildWithName(Identifiers::LinearArrayTreeType);
 
         // and set up the modules.
         updateArrayLayout(dynamicTree[Identifiers::ArrayLayoutParamID]);
@@ -180,7 +181,6 @@ namespace ananas::WFS::UI
     void WFSInterfaceComponent::updateModuleLists()
     {
         juce::StringArray ips, labels;
-        std::map<int, juce::String> slotModules;
         auto hasAmbisonicsModules{false};
 
         for (const auto &module : modulesNode) {
@@ -193,8 +193,15 @@ namespace ananas::WFS::UI
 
                 hasAmbisonicsModules |= type == ananas::Utils::FirmwareType::ambisonicsModule;
             }
-            if (const int slot{module.getProperty(ananas::Utils::Identifiers::ModuleSlotPropertyID)}; slot >= 0) {
-                slotModules[slot] = ip;
+        }
+
+        // The module in each slot, from the linear-array setup.
+        std::map<int, juce::String> slotModules;
+        for (const auto &slot : linearArrayNode) {
+            if (!slot.hasType(Identifiers::LinearArraySlotTreeType)) continue;
+            const auto ip{slot.getProperty(Identifiers::LinearArraySlotModuleIpPropertyID).toString()};
+            if (ip.isNotEmpty()) {
+                slotModules[slot.getProperty(Identifiers::LinearArraySlotIndexPropertyID)] = ip;
             }
         }
 
@@ -278,7 +285,8 @@ namespace ananas::WFS::UI
     {
         // if (!isVisible()) return;
 
-        if (treeWhosePropertyHasChanged.hasType(ananas::Utils::Identifiers::ModuleTreeType)) {
+        if (treeWhosePropertyHasChanged.hasType(ananas::Utils::Identifiers::ModuleTreeType)
+            || treeWhosePropertyHasChanged.hasType(Identifiers::LinearArraySlotTreeType)) {
             updateModuleLists();
         } else if (property == Identifiers::ArrayLayoutParamID) {
             updateArrayLayout(treeWhosePropertyHasChanged[property]);
@@ -287,14 +295,14 @@ namespace ananas::WFS::UI
 
     void WFSInterfaceComponent::valueTreeChildAdded(juce::ValueTree &parentTree, juce::ValueTree &) 
     {
-        if (parentTree == modulesNode) {
+        if (parentTree == modulesNode || parentTree == linearArrayNode) {
             updateModuleLists();
         }
     }
 
     void WFSInterfaceComponent::valueTreeChildRemoved(juce::ValueTree &parentTree, juce::ValueTree &, int) 
     {
-        if (parentTree == modulesNode) {
+        if (parentTree == modulesNode || parentTree == linearArrayNode) {
             updateModuleLists();
         }
     }

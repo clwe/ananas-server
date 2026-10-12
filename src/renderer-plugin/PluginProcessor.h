@@ -10,6 +10,7 @@
 #include "RenderLayout.h"
 #include "SecondarySourceMessenger.h"
 #include "Renderers/Renderer.h"
+#include "LinearArray.h"
 
 class PluginProcessor final : public juce::AudioProcessor,
                               public juce::ChangeListener,
@@ -65,7 +66,7 @@ public:
     /**
      * Put a module in an array slot; an empty IP clears the slot.
      */
-    void assignModuleToSlot(int slot, const juce::String &moduleIP) const;
+    void assignModuleToSlot(int slot, const juce::String &moduleIP);
 
     juce::AudioProcessorValueTreeState &getParamState();
 
@@ -112,6 +113,12 @@ private:
      */
     void sendSpeakerPositions(bool resendUnconfirmed);
 
+    // Until the number of slots and the spacing stop being parameters:
+    // passes their values into the linear-array setup.
+    void passParametersToSetup();
+
+    void updateLinearArrayTree();
+
     static bool isEchoedByModule(const ananas::ModuleInfo &info, const std::vector<juce::Point<float>> &positions);
 
     std::unique_ptr<ananas::Server::Server> server;
@@ -126,6 +133,8 @@ private:
     juce::ValueTree modulesTree;
     // The switch list, mirrored as child nodes of persistentTree for the UI.
     juce::ValueTree switchesTree;
+    // The linear array tree, mirrored for the UI.
+    juce::ValueTree linearArrayTree;
 
     ananas::WFS::SecondarySourceMessenger secondarySourceMessenger;
 
@@ -136,6 +145,8 @@ private:
     juce::HashMap<int, std::atomic<float> *> virtualSourceAmplitudes;
 
     ananas::WFS::RenderLayout renderLayout;
+
+    ananas::WFS::LinearArraySetup linearArraySetup;
 
     struct SentPositions
     {

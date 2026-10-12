@@ -23,8 +23,6 @@ struct LinearArray
 LinearArray generateLinearArray(const LinearArraySettings &settings,
                                 const std::vector<ModuleList::Entry> &modules);
 
-LinearArraySettings settingsFromModuleSlots(const std::vector<ModuleList::Entry> & modules, int numSlots, float speakerSpacing);
-
 /**
  * The plugin's linear-array settings: the one live instance, changed only
  * through its methods, which keep it valid and notify listeners.

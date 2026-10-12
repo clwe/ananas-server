@@ -44,33 +44,18 @@ public:
             expect(find(list, "wfs").isConnected);
         }
 
-        beginTest("A slot holds one module, whatever its type");
-        {
-            list.assignSlot(0, "wfs");
-            list.assignSlot(1, "ambi");
-            expectEquals(find(list, "wfs").info.slot, 0);
-            expectEquals(find(list, "ambi").info.slot, 1);
-            list.assignSlot(1, "legacy");
-            expectEquals(find(list, "legacy").info.slot, 1);
-            expectEquals(find(list, "ambi").info.slot, -1);
-            list.assignSlot(1, {});
-            expectEquals(find(list, "legacy").info.slot, -1);
-        }
-
         beginTest("Saved and restored with the project");
         {
-            list.assignSlot(2, "ambi");
             ananas::ModuleList restored;
             restored.fromValueTree(list.toValueTree());
             expectEquals(static_cast<int>(restored.getEntries().size()), 3);
             const auto ambi{find(restored, "ambi")};
-            expectEquals(ambi.info.slot, 2);
             expect(ambi.info.firmwareType == Type::ambisonicsModule);
             expectEquals(ambi.info.numSpeakers, 5);
             expect(!ambi.isConnected);
         }
 
-        beginTest("Projects without firmware type or slot restore as unassigned WFS modules");
+        beginTest("Saved modules without firmware type or counts restore as legacy WFS modules");
         {
             juce::ValueTree tree{ananas::Utils::Identifiers::ModulesParamID};
             juce::ValueTree module{"Module"};
@@ -81,7 +66,6 @@ public:
             ananas::ModuleList old;
             old.fromValueTree(tree);
             const auto e{find(old, "old")};
-            expectEquals(e.info.slot, -1);
             expect(e.info.firmwareType == Type::wfsModule);
             expectEquals(e.info.numSpeakers, ananas::Utils::Constants::LegacyNumSpeakers);
         }

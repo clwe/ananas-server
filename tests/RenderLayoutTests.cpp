@@ -4,22 +4,28 @@
 
 namespace
 {
-    ananas::ModuleList::Entry makeModule(const juce::String &ip, const int slot, const int numSpeakers,
-                                         const int numSources = ananas::Utils::Constants::LegacyNumSources,
-                                         const ananas::Utils::FirmwareType type = ananas::Utils::FirmwareType::wfsModule)
+    // A module, and the slot the test puts it in (-1: none).
+    struct PlacedModule
+    {
+        ananas::ModuleList::Entry entry;
+        int slot;
+    };
+
+    PlacedModule makeModule(const juce::String &ip, const int slot, const int numSpeakers,
+                            const int numSources = ananas::Utils::Constants::LegacyNumSources,
+                            const ananas::Utils::FirmwareType type = ananas::Utils::FirmwareType::wfsModule)
     {
         ananas::ModuleInfo info;
-        info.slot = slot;
         info.numSpeakers = numSpeakers;
         info.numSources = numSources;
         info.firmwareType = type;
-        return {ip, info, true};
+        return {{ip, info, true}, slot};
     }
 
     bool approximatelyEqual(const float a, const float b) { return std::abs(a - b) < 1e-5f; }
 
-    // What the processor computes from the module list: the linear array
-    // (slots from each module's slot) and the render layout derived from it.
+    // What the processor computes: the linear array generated from the
+    // settings, and the render layout derived from it.
     struct Computed
     {
         ananas::WFS::LinearArray array;
@@ -28,9 +34,21 @@ namespace
         [[nodiscard]] int totalNumSpeakers() const { return static_cast<int>(array.layout.getSpeakers().size()); }
     };
 
-    Computed compute(const std::vector<ananas::ModuleList::Entry> &modules, const int numSlots, const float speakerSpacing)
+    Computed compute(const std::vector<PlacedModule> &placedModules, const int numSlots, const float speakerSpacing)
     {
-        const auto settings = ananas::WFS::settingsFromModuleSlots(modules, numSlots, speakerSpacing);
+        ananas::WFS::LinearArraySettings settings;
+        settings.numSlots = numSlots;
+        settings.speakerSpacing = speakerSpacing;
+        settings.slotModuleIps.resize(static_cast<size_t>(numSlots));
+
+        std::vector<ananas::ModuleList::Entry> modules;
+        for (const auto &m: placedModules) {
+            modules.push_back(m.entry);
+            if (m.slot >= 0 && m.slot < numSlots) {
+                settings.slotModuleIps[static_cast<size_t>(m.slot)] = m.entry.ip;
+            }
+        }
+
         auto array = ananas::WFS::generateLinearArray(settings, modules);
         auto layout = ananas::WFS::RenderLayout::compute(array.layout, modules);
         return {std::move(array), std::move(layout)};

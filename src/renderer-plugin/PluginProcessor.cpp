@@ -29,6 +29,13 @@ PluginProcessor::PluginProcessor()
     server->getModuleList()->addChangeListener(this);
     server->getAuthority()->addChangeListener(this);
     server->getSwitches()->addChangeListener(this);
+
+    linearArrayTree = persistentTree.getOrCreateChildWithName(ananas::WFS::Identifiers::LinearArrayTreeType, nullptr);
+
+    passParametersToSetup();
+    updateLinearArrayTree();
+
+    linearArraySetup.addChangeListener(this);
     apvts.addParameterListener(ananas::WFS::Params::NumModules.id, this);
     apvts.addParameterListener(ananas::WFS::Params::SpeakerSpacing.id, this);
     for (uint n{0}; n < ananas::WFS::Constants::NumSources; ++n) {
@@ -50,6 +57,7 @@ PluginProcessor::~PluginProcessor()
     server->getModuleList()->removeChangeListener(this);
     server->getAuthority()->removeChangeListener(this);
     server->getSwitches()->removeChangeListener(this);
+    linearArraySetup.removeChangeListener(this);
     apvts.removeParameterListener(ananas::WFS::Params::NumModules.id, this);
     apvts.removeParameterListener(ananas::WFS::Params::SpeakerSpacing.id, this);
     stopTimer();
@@ -186,10 +194,11 @@ void PluginProcessor::getStateInformation(juce::MemoryBlock &destData)
     // sure the saved state holds exactly one (current) copy of each.
     removeChildrenWithType(state, ananas::Utils::Identifiers::SwitchesParamID);
     removeChildrenWithType(state, ananas::Utils::Identifiers::ModulesParamID);
+    removeChildrenWithType(state, ananas::WFS::Identifiers::LinearArrayTreeType);
 
     state.addChild(getServer().getSwitches()->toValueTree(), -1, nullptr);
-
     state.addChild(getServer().getModuleList()->toValueTree(), -1, nullptr);
+    state.addChild(linearArraySetup.toValueTree(), -1, nullptr);
 
     const auto xml(state.createXml());
     copyXmlToBinary(*xml, destData);
@@ -215,8 +224,14 @@ void PluginProcessor::setStateInformation(const void *data, int size)
                 getServer().getModuleList()->fromValueTree(moduleListTree);
             }
 
+            const auto savedLinearArray{getLastChildWithType(tree, ananas::WFS::Identifiers::LinearArrayTreeType)};
+            if (savedLinearArray.isValid()) {
+                linearArraySetup.fromValueTree(savedLinearArray);
+            }
+
             removeChildrenWithType(tree, ananas::Utils::Identifiers::SwitchesParamID);
             removeChildrenWithType(tree, ananas::Utils::Identifiers::ModulesParamID);
+            removeChildrenWithType(tree, ananas::WFS::Identifiers::LinearArrayTreeType);
 
             apvts.replaceState(tree);
         }
@@ -258,7 +273,16 @@ void PluginProcessor::changeListenerCallback(juce::ChangeBroadcaster *source)
         dynamicTree.setProperty(ananas::Utils::Identifiers::TimeAuthorityParamID, authority->toVar(), nullptr);
     } else if (const auto *switches = dynamic_cast<ananas::SwitchList *>(source)) {
         ananas::Utils::syncChildren(switchesTree, switches->toValueTree(true), ananas::Utils::Identifiers::SwitchIdentifierPropertyID);
+    } else if (source == &linearArraySetup) {
+        updateLinearArrayTree();
+        updateRenderLayout();
     }
+}
+
+void PluginProcessor::updateLinearArrayTree() {
+    ananas::Utils::syncChildren(linearArrayTree, linearArraySetup.toValueTree(), ananas::WFS::Identifiers::LinearArraySlotIndexPropertyID);
+    linearArrayTree.setProperty(ananas::WFS::Identifiers::LinearArrayNumSlotsPropertyID, linearArraySetup.getSettings().numSlots, nullptr);
+    linearArrayTree.setProperty(ananas::WFS::Identifiers::LinearArraySpeakerSpacingPropertyID, linearArraySetup.getSettings().speakerSpacing, nullptr);
 }
 
 void PluginProcessor::parameterChanged(const juce::String &parameterID, const float newValue)
@@ -271,7 +295,7 @@ void PluginProcessor::parameterChanged(const juce::String &parameterID, const fl
 
 void PluginProcessor::handleAsyncUpdate()
 {
-    updateRenderLayout();
+    passParametersToSetup();
 }
 
 void PluginProcessor::timerCallback()
@@ -279,18 +303,25 @@ void PluginProcessor::timerCallback()
     sendSpeakerPositions(true);
 }
 
-void PluginProcessor::assignModuleToSlot(const int slot, const juce::String &moduleIP) const
+void PluginProcessor::passParametersToSetup()
 {
-    server->getModuleList()->assignSlot(slot, moduleIP);
+    const auto numSlots{static_cast<int>(apvts.getRawParameterValue(ananas::WFS::Params::NumModules.id)->load())};
+    const auto speakerSpacing{apvts.getRawParameterValue(ananas::WFS::Params::SpeakerSpacing.id)->load()};
+
+    linearArraySetup.setNumSlots(numSlots);
+    linearArraySetup.setSpeakerSpacing(speakerSpacing);
+}
+
+void PluginProcessor::assignModuleToSlot(const int slot, const juce::String &moduleIP)
+{
+    linearArraySetup.assignModule(slot, moduleIP);
 }
 
 void PluginProcessor::updateRenderLayout()
 {
-    const auto numSlots{static_cast<int>(apvts.getRawParameterValue(ananas::WFS::Params::NumModules.id)->load())};
-    const auto speakerSpacing{apvts.getRawParameterValue(ananas::WFS::Params::SpeakerSpacing.id)->load()};
     const auto modules{server->getModuleList()->getEntries()};
 
-    const auto linArrSettings = ananas::WFS::settingsFromModuleSlots(modules, numSlots, speakerSpacing);
+    const auto &linArrSettings = linearArraySetup.getSettings();
     
     ananas::WFS::LinearArray linArr = ananas::WFS::generateLinearArray(linArrSettings, modules);
 
