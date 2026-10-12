@@ -1,0 +1,108 @@
+#include "LayoutCheck.h"
+
+namespace ananas::WFS
+{
+    namespace
+    {
+        // Closer than this, two speakers count as being at the same position.
+        constexpr float SamePositionToleranceMetres = .01f;
+
+        juce::String outputName(const Speaker &s)
+        {
+            return s.moduleIp + " output " + juce::String{s.output};
+        }
+    }
+
+    std::vector<LayoutProblem> checkLayout(const SpeakerLayout &layout,
+                                           const std::vector<ModuleList::Entry> &modules)
+    {
+        using Type = LayoutProblem::Type;
+        using Severity = LayoutProblem::Severity;
+
+        std::vector<LayoutProblem> problems;
+        const auto &speakers = layout.getSpeakers();
+
+        std::map<juce::String, const ModuleList::Entry *> modulesByIp;
+        for (const auto &m: modules) {
+            modulesByIp[m.ip] = &m;
+        }
+
+        // Which speakers use each output of each module, to find outputs
+        // used twice or not at all.
+        std::map<juce::String, std::map<int, std::vector<int>>> speakersByOutput;
+
+        for (size_t i = 0; i < speakers.size(); ++i) {
+            const auto &s = speakers[i];
+            const auto index = static_cast<int>(i);
+
+            if (s.moduleIp.isEmpty()) {
+                problems.push_back({Type::noModule, Severity::info, index, {},
+                                    "No module drives this speaker."});
+            } else {
+                const auto it = modulesByIp.find(s.moduleIp);
+                if (it == modulesByIp.end()) {
+                    problems.push_back({Type::unknownModule, Severity::warning, index, s.moduleIp,
+                                        "Module " + s.moduleIp + " is unknown."});
+                } else {
+                    const auto &module = *it->second;
+                    // Counts the module as part of the layout, even if this
+                    // speaker's output is out of range.
+                    auto &outputs = speakersByOutput[s.moduleIp];
+                    if (!module.isConnected) {
+                        problems.push_back({Type::moduleNotConnected, Severity::warning, index, s.moduleIp,
+                                            "Module " + s.moduleIp + " isn't connected."});
+                    }
+                    if (s.output < 0 || s.output >= module.info.numSpeakers) {
+                        problems.push_back({Type::outputOutOfRange, Severity::warning, index, s.moduleIp,
+                                            "Module " + s.moduleIp + " has no output " + juce::String{s.output}
+                                            + " (it has " + juce::String{module.info.numSpeakers} + ")."});
+                    } else {
+                        outputs[s.output].push_back(index);
+                    }
+                }
+            }
+
+            for (size_t j = 0; j < speakers.size(); ++j) {
+                if (j == i) continue;
+                if (s.position.getDistanceFrom(speakers[j].position) < SamePositionToleranceMetres) {
+                    problems.push_back({Type::samePosition, Severity::warning, index, s.moduleIp,
+                                        "Speaker " + juce::String{j + 1} + " is at the same position."});
+                    break;
+                }
+            }
+        }
+
+        for (const auto &[ip, outputs]: speakersByOutput) {
+            for (const auto &[output, indices]: outputs) {
+                if (indices.size() < 2) continue;
+                for (const auto index: indices) {
+                    problems.push_back({Type::outputUsedTwice, Severity::warning, index, ip,
+                                        outputName(speakers[static_cast<size_t>(index)])
+                                        + " drives more than one speaker."});
+                }
+            }
+        }
+
+        // Outputs of modules in the layout that no speaker uses. Modules
+        // without any speaker are simply unassigned, not a problem.
+        for (const auto &[ip, outputs]: speakersByOutput) {
+            const auto &module = *modulesByIp.at(ip);
+            for (int output = 0; output < module.info.numSpeakers; ++output) {
+                if (outputs.count(output) == 0) {
+                    problems.push_back({Type::outputUnused, Severity::warning, -1, ip,
+                                        "Module " + ip + " output " + juce::String{output}
+                                        + " drives no speaker, but still plays."});
+                }
+            }
+        }
+
+        // By speaker (module-level problems last), then in the order found.
+        std::stable_sort(problems.begin(), problems.end(), [](const LayoutProblem &a, const LayoutProblem &b)
+        {
+            const auto key = [](const LayoutProblem &p) { return p.speakerIndex < 0 ? std::numeric_limits<int>::max() : p.speakerIndex; };
+            return key(a) < key(b);
+        });
+
+        return problems;
+    }
+}

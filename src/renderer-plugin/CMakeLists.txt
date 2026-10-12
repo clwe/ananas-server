@@ -43,6 +43,7 @@ target_sources(ananasRenderer
         RenderLayout.cpp
         SpeakerLayout.cpp
         LinearArray.cpp
+        LayoutCheck.cpp
         PluginEditor.cpp
         PluginProcessor.cpp
         Renderers/WfsRenderer.cpp
