@@ -646,6 +646,20 @@ namespace ananas::Server
     ) : AnanasThread(p),
         switches(switches)
     {
+        addListener(this);
+    }
+
+    Server::SwitchInspector::~SwitchInspector()
+    {
+        removeListener(this);
+    }
+
+    void Server::SwitchInspector::exitSignalSent()
+    {
+        const juce::ScopedLock sl{curlLock};
+        if (!isResettingPtp) {
+            curl.kill();
+        }
     }
 
     void Server::SwitchInspector::runImpl()
@@ -660,16 +674,31 @@ namespace ananas::Server
                 juce::var jsonData{new juce::DynamicObject};
                 juce::var response;
 
+                if (threadShouldExit()) break;
+
                 if (switches.takePtpResetRequest(s.id)) {
+                    // Disabling and re-enabling PTP belong together: once
+                    // started, finish both, even if asked to stop meanwhile.
+                    {
+                        const juce::ScopedLock sl{curlLock};
+                        isResettingPtp = true;
+                    }
                     jsonData.getDynamicObject()->setProperty("numbers", "0");
-                    response = curlRequest(s.ip, s.username, s.password, Constants::SwitchDisablePtpPath, juce::JSON::toString(jsonData));
+                    response = curlRequest(s.ip, s.username, s.password, Constants::SwitchDisablePtpPath, juce::JSON::toString(jsonData), true);
                     switches.handleResponse(s.id, response);
-                    response = curlRequest(s.ip, s.username, s.password, Constants::SwitchEnablePtpPath, juce::JSON::toString(jsonData));
+                    response = curlRequest(s.ip, s.username, s.password, Constants::SwitchEnablePtpPath, juce::JSON::toString(jsonData), true);
                     switches.handleResponse(s.id, response);
+                    {
+                        const juce::ScopedLock sl{curlLock};
+                        isResettingPtp = false;
+                    }
                 } else {
                     jsonData.getDynamicObject()->setProperty("numbers", "0");
                     jsonData.getDynamicObject()->setProperty("once", "");
                     response = curlRequest(s.ip, s.username, s.password, Constants::SwitchMonitorPtpPath, juce::JSON::toString(jsonData));
+                    // A request ended because the thread is stopping isn't a
+                    // switch error; don't report it as one.
+                    if (threadShouldExit()) break;
                     switches.handleResponse(s.id, response);
                 }
             }
@@ -692,7 +721,8 @@ namespace ananas::Server
                                                    const juce::String &username,
                                                    const juce::String &password,
                                                    const juce::StringRef &path,
-                                                   const juce::String &postData)
+                                                   const juce::String &postData,
+                                                   const bool evenWhenStopping)
     {
         const juce::URL url("http://" + ip + path);
 
@@ -709,10 +739,15 @@ namespace ananas::Server
         args.add("-d");
         args.add(postData);
 
-        if (curl.start(args)) {
-            const auto response{curl.readAllProcessOutput()};
-            return juce::JSON::parse(response);
+        {
+            // Not after exitSignalSent() has run, or it couldn't end this one.
+            const juce::ScopedLock sl{curlLock};
+            if (threadShouldExit() && !evenWhenStopping) return juce::var{};
+            if (!curl.start(args)) return juce::var{};
         }
-        return juce::var{};
+
+        // Returns early if exitSignalSent() kills curl.
+        const auto response{curl.readAllProcessOutput()};
+        return juce::JSON::parse(response);
     }
 }

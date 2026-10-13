@@ -128,9 +128,12 @@ namespace ananas::Server
     class Threads
     {
     public:
+        // The inspector ends a running curl request when asked to stop, but
+        // lets a PTP reset (two requests of up to SwitchInspectorRequestTimeoutS
+        // each) finish, so PTP isn't left disabled on the switch.
         inline static const Utils::ThreadParams SwitchInspectorThreadParams{
             "Ananas Switch Inspector",
-            100
+            3000
         };
     };
 

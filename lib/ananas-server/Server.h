@@ -297,10 +297,13 @@ namespace ananas::Server
 
         //======================================================================
 
-        class SwitchInspector final : public AnanasThread
+        class SwitchInspector final : public AnanasThread,
+                                      private juce::Thread::Listener
         {
         public:
             SwitchInspector(const Utils::ThreadParams &p, SwitchList &switches);
+
+            ~SwitchInspector() override;
 
             bool connect() override;
 
@@ -308,9 +311,17 @@ namespace ananas::Server
             void runImpl() override;
 
         private:
+            // Called when the thread is asked to stop: ends a running curl
+            // request, so the thread stops promptly instead of being killed
+            // (which crashed the host on quit), unless a PTP reset is running.
+            void exitSignalSent() override;
+
             SwitchList &switches;
             juce::ChildProcess curl;
             int curlTimeoutS{0};
+            // Guards starting and killing curl, and isResettingPtp.
+            juce::CriticalSection curlLock;
+            bool isResettingPtp{false};
 
             /**
              * E.g. curl -s -k -u admin:emeraude http://192.168.10.1/rest/system/ptp/monitor -d \'{"numbers":"0","once":""}\' -H "content-type: application/json"
@@ -325,7 +336,8 @@ namespace ananas::Server
                                   const juce::String &username,
                                   const juce::String &password,
                                   const juce::StringRef &path,
-                                  const juce::String &postData);
+                                  const juce::String &postData,
+                                  bool evenWhenStopping = false);
 
             JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(SwitchInspector);
         };
