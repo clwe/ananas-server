@@ -12,6 +12,16 @@ struct Speaker
     int output = -1;               // output index on that module
 };
 
+inline bool operator==(const Speaker &a, const Speaker &b)
+{
+    return a.position == b.position && a.moduleIp == b.moduleIp && a.output == b.output;
+}
+
+inline bool operator!=(const Speaker &a, const Speaker &b)
+{
+    return !(a == b);
+}
+
 class SpeakerLayout
 {
 public:

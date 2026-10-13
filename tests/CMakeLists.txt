@@ -8,6 +8,7 @@ target_sources(ananas_tests
         LinearArrayTests.cpp
         LinearArraySetupTests.cpp
         LayoutCheckTests.cpp
+        CustomLayoutTests.cpp
         ModuleListTests.cpp
         SwitchListTests.cpp
         ValueTreeUtilsTests.cpp
@@ -17,6 +18,7 @@ target_sources(ananas_tests
         ${CMAKE_SOURCE_DIR}/src/renderer-plugin/SpeakerLayout.cpp
         ${CMAKE_SOURCE_DIR}/src/renderer-plugin/LinearArray.cpp
         ${CMAKE_SOURCE_DIR}/src/renderer-plugin/LayoutCheck.cpp
+        ${CMAKE_SOURCE_DIR}/src/renderer-plugin/CustomLayout.cpp
         ${CMAKE_SOURCE_DIR}/src/renderer-plugin/Renderers/AmbisonicEncoder.cpp
         ${CMAKE_SOURCE_DIR}/src/renderer-plugin/Renderers/AmbisonicsRenderer.cpp
         ${CMAKE_SOURCE_DIR}/src/renderer-plugin/Renderers/AmbisonicsControlMessenger.cpp

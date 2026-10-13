@@ -216,6 +216,10 @@ namespace ananas::WFS
         // The speakers the renderers use, with the problems checkLayout()
         // found; derived, so mirrored in the dynamic tree.
         inline static const juce::Identifier SpeakerLayoutTreeType{"SpeakerLayout"};
+        // A layout of explicitly placed speakers, saved with the project; its
+        // Speaker children use the index, position, module and output
+        // properties below.
+        inline static const juce::Identifier CustomLayoutTreeType{"CustomLayout"};
         inline static const juce::Identifier SpeakerLayoutModuleProblemsPropertyID{"moduleProblems"};
         inline static const juce::Identifier SpeakerTreeType{"Speaker"};
         inline static const juce::Identifier SpeakerIndexPropertyID{"index"};
