@@ -7,10 +7,12 @@ namespace
     using ananas::WFS::LayoutProblem;
     using Type = LayoutProblem::Type;
 
-    ananas::ModuleList::Entry makeModule(const juce::String &ip, const int numSpeakers, const bool isConnected = true)
+    ananas::ModuleList::Entry makeModule(const juce::String &ip, const int numSpeakers, const bool isConnected = true,
+                                         const ananas::Utils::FirmwareType type = ananas::Utils::FirmwareType::wfsModule)
     {
         ananas::ModuleInfo info;
         info.numSpeakers = numSpeakers;
+        info.firmwareType = type;
         return {ip, info, isConnected};
     }
 
@@ -161,6 +163,18 @@ public:
                 previous = key;
             }
             expect(problems.back().type == Type::outputUnused);
+        }
+
+        beginTest("WFS speakers off y = 0 are warned about; other speakers aren't");
+        {
+            const auto ambisonics = ananas::Utils::FirmwareType::ambisonicsModule;
+            const auto layout = makeLayout({{{0.f, 0.f}, "wfs", 0}, {{.2f, -.5f}, "wfs", 1},
+                                            {{0.f, -2.f}, "ambi", 0}, {{1.f, -2.f}, "ambi", 1},
+                                            {{2.f, -1.f}, {}, -1}});
+            const auto problems = checkLayout(layout, {makeModule("wfs", 2), makeModule("ambi", 2, true, ambisonics)});
+
+            expect(has(problems, Type::wfsSpeakerOffArrayLine, 1));
+            expectEquals(count(problems, Type::wfsSpeakerOffArrayLine), 1);
         }
 
         beginTest("Tree for the UI: one child per speaker, with its worst severity and its problems");

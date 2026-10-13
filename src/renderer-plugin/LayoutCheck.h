@@ -26,6 +26,10 @@ namespace ananas::WFS
             outputUsedTwice,
             // Another speaker is at (almost) the same position.
             samePosition,
+            // A WFS module's speaker that isn't on y = 0. WFS modules assume a
+            // straight array on y = 0, facing the listener, until speaker
+            // orientation is sent too.
+            wfsSpeakerOffArrayLine,
             // A module that drives speakers has an output no speaker uses;
             // it still plays, at the origin. Not tied to one speaker.
             outputUnused,

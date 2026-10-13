@@ -18,8 +18,8 @@ namespace ananas::WFS
 
         [[nodiscard]] juce::var toVar() const;
 
-        // x-coordinate of the rightmost speaker; virtual source x-coordinates
-        // are scaled to this.
+        // Largest |x| of the WFS array's speakers (and of speakers without a
+        // module); source x-coordinates are scaled to this, for all renderers.
         float outerSpeakerX{0.f};
         // Sources rendered by every assigned WFS module.
         int numRenderedSources{0};

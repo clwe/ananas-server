@@ -85,9 +85,18 @@ Positions stay on the server; the firmware never stores or hardcodes them.
         to the modules' output counts. They're edited through their
         parameters; to move single speakers, convert the part to an
         explicit one (otherwise regenerating would overwrite the edits).
-      - `outerSpeakerX` is currently the largest |x| of all speakers; with
-        more than one part it must only cover the WFS modules' speakers,
-        or the WFS source scaling includes e.g. an Ambisonics ring.
+      - Done: `outerSpeakerX`, which both renderers scale source positions
+        to, covers the WFS modules' speakers and speakers without a module
+        (all speakers if there are only Ambisonics modules), so e.g. an
+        Ambisonics ring doesn't widen it.
+        Open: in a *linear array* whose two outer slots both hold
+        Ambisonics modules, this is narrower than the array the XY view
+        draws (slot selectors and speaker icons span the whole array), so
+        a source at the view's edge is drawn above the outer speaker but
+        rendered at the end of the WFS part. Audio is consistent between
+        the renderers; only the view is off. Option: scale to the whole
+        array in linear-array mode (a `compute()` parameter). Decide
+        together with how the XY view changes for 3-D coordinates.
       - The WFS firmware and `VirtualSourceMessenger` assume the array on
         y = 0, facing the listener. Keep WFS parts at their default
         position until speaker orientation (`/ss/<j>/nx|ny`) exists.

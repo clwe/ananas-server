@@ -109,6 +109,38 @@ public:
             expectEquals(mixed.totalNumSpeakers(), 21);
             expect(approximatelyEqual(mixed.layout.modulePositions.at("ambi")[0].x, -1.f + 16 * .1f));
         }
+
+        // Custom layouts: speakers placed directly, not generated.
+        const auto computeCustom = [](std::vector<ananas::WFS::Speaker> speakers,
+                                      const std::vector<ananas::ModuleList::Entry> &modules)
+        {
+            ananas::WFS::SpeakerLayout layout;
+            layout.setSpeakers(std::move(speakers));
+            return ananas::WFS::RenderLayout::compute(layout, modules);
+        };
+        const auto ambisonics = ananas::Utils::FirmwareType::ambisonicsModule;
+
+        beginTest("Source scaling: an Ambisonics ring around a WFS array doesn't widen it");
+        {
+            const auto layout = computeCustom({{{-1.f, 0.f}, "wfs", 0}, {{1.f, 0.f}, "wfs", 1},
+                                               {{-3.f, -2.f}, "ambi", 0}, {{3.f, -2.f}, "ambi", 1}},
+                                              {makeModule("wfs", 0, 2).entry, makeModule("ambi", 0, 2, 9, ambisonics).entry});
+            expect(approximatelyEqual(layout.outerSpeakerX, 1.f));
+        }
+
+        beginTest("Source scaling: speakers without a module count as part of the array");
+        {
+            const auto layout = computeCustom({{{-1.f, 0.f}, "wfs", 0}, {{2.f, 0.f}, {}, -1}, {{3.f, -2.f}, "ambi", 0}},
+                                              {makeModule("wfs", 0, 1).entry, makeModule("ambi", 0, 1, 9, ambisonics).entry});
+            expect(approximatelyEqual(layout.outerSpeakerX, 2.f));
+        }
+
+        beginTest("Source scaling: with Ambisonics modules only, all speakers count");
+        {
+            const auto layout = computeCustom({{{-3.f, -2.f}, "ambi", 0}, {{2.5f, -2.f}, "ambi", 1}},
+                                              {makeModule("ambi", 0, 2, 9, ambisonics).entry});
+            expect(approximatelyEqual(layout.outerSpeakerX, 3.f));
+        }
     }
 };
 

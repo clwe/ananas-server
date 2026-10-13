@@ -7,6 +7,8 @@ namespace ananas::WFS
     {
         // Closer than this, two speakers count as being at the same position.
         constexpr float SamePositionToleranceMetres = .01f;
+        // Further than this from y = 0, a WFS speaker is off the array line.
+        constexpr float ArrayLineToleranceMetres = .01f;
 
         juce::String outputName(const Speaker &s)
         {
@@ -52,6 +54,11 @@ namespace ananas::WFS
                     if (!module.isConnected) {
                         problems.push_back({Type::moduleNotConnected, Severity::warning, index, s.moduleIp,
                                             "Module " + s.moduleIp + " isn't connected."});
+                    }
+                    if (module.info.firmwareType == ::ananas::Utils::FirmwareType::wfsModule
+                        && std::abs(s.position.y) > ArrayLineToleranceMetres) {
+                        problems.push_back({Type::wfsSpeakerOffArrayLine, Severity::warning, index, s.moduleIp,
+                                            "WFS speakers must be on y = 0 for now."});
                     }
                     if (s.output < 0 || s.output >= module.info.numSpeakers) {
                         problems.push_back({Type::outputOutOfRange, Severity::warning, index, s.moduleIp,
