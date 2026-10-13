@@ -331,8 +331,20 @@ void PluginProcessor::setLayoutMode(const ananas::WFS::LayoutMode mode)
 
 void PluginProcessor::convertToCustomLayout()
 {
-    customLayout.setSpeakers(generateLinearArray().layout.getSpeakers());
+    loadCustomLayout(generateLinearArray().layout.getSpeakers());
+}
+
+void PluginProcessor::loadCustomLayout(std::vector<ananas::WFS::Speaker> speakers)
+{
+    customLayout.setSpeakers(std::move(speakers));
     setLayoutMode(ananas::WFS::LayoutMode::custom);
+    // setLayoutMode only updates if the mode changes.
+    updateRenderLayout();
+}
+
+const ananas::WFS::SpeakerLayout &PluginProcessor::getSpeakerLayout() const
+{
+    return speakerLayout;
 }
 
 ananas::WFS::LinearArray PluginProcessor::generateLinearArray() const
@@ -369,7 +381,8 @@ void PluginProcessor::updateRenderLayout()
     const auto isCustom = layoutMode == ananas::WFS::LayoutMode::custom;
 
     const auto linArr = generateLinearArray();
-    const ananas::WFS::SpeakerLayout &speakers = isCustom ? customLayout.getLayout() : linArr.layout;
+    speakerLayout = isCustom ? customLayout.getLayout() : linArr.layout;
+    const auto &speakers = speakerLayout;
 
     renderLayout = ananas::WFS::RenderLayout::compute(speakers, modules);
 

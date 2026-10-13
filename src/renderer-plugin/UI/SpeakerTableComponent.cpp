@@ -1,6 +1,7 @@
 #include "SpeakerTableComponent.h"
 #include "../LayoutCheck.h"
 #include "../WFSUtils.h"
+#include "../LayoutFile.h"
 
 namespace ananas::WFS::UI
 {
@@ -205,10 +206,14 @@ namespace ananas::WFS::UI
                                                  juce::ValueTree &persistentTree,
                                                  CustomLayout &customLayoutRef,
                                                  std::function<void(LayoutMode)> onLayoutModeSelectedCallback,
-                                                 std::function<void()> onConvertToCustomLayoutCallback)
+                                                 std::function<void()> onConvertToCustomLayoutCallback,
+                                                 std::function<const SpeakerLayout &()> getLayoutToSaveCallback,
+                                                 std::function<void(std::vector<Speaker>)> onLayoutLoadedCallback)
         : customLayout(customLayoutRef),
           onLayoutModeSelected(std::move(onLayoutModeSelectedCallback)),
           onConvertToCustomLayout(std::move(onConvertToCustomLayoutCallback)),
+          getLayoutToSave(std::move(getLayoutToSaveCallback)),
+          onLayoutLoaded(std::move(onLayoutLoadedCallback)),
           speakerLayoutNode(dynamicTree.getChildWithName(Identifiers::SpeakerLayoutTreeType)),
           layoutNode(persistentTree.getChildWithName(Identifiers::LayoutTreeType)),
           modulesNode(persistentTree.getChildWithName(::ananas::Utils::Identifiers::ModulesParamID))
@@ -217,6 +222,8 @@ namespace ananas::WFS::UI
         addAndMakeVisible(layoutModeLabel);
         addAndMakeVisible(layoutModeSelector);
         addAndMakeVisible(convertButton);
+        addAndMakeVisible(saveButton);
+        addAndMakeVisible(loadButton);
         addChildComponent(addSpeakerButton);
         addChildComponent(removeSpeakersButton);
         addAndMakeVisible(table);
@@ -241,7 +248,19 @@ namespace ananas::WFS::UI
         convertButton.setButtonText("Copy linear array to custom");
         convertButton.setTooltip("Replaces the custom layout with the speakers of the linear array, "
                                  "including their modules, and switches to it.");
-        convertButton.onClick = [this] { confirmConvertToCustomLayout(); };
+        convertButton.onClick = [this]
+        {
+            confirmReplacingCustomLayout("The custom layout's speakers will be replaced by those of the linear array.",
+                                         [this] { if (onConvertToCustomLayout) onConvertToCustomLayout(); });
+        };
+
+        saveButton.setButtonText("Save layout...");
+        saveButton.setTooltip("Saves the speakers in use to a speaker layout file.");
+        saveButton.onClick = [this] { saveLayout(); };
+
+        loadButton.setButtonText("Load layout...");
+        loadButton.setTooltip("Loads a speaker layout file into the custom layout, and switches to it.");
+        loadButton.onClick = [this] { loadLayout(); };
 
         addSpeakerButton.setButtonText("Add speaker");
         addSpeakerButton.onClick = [this] { customLayout.addSpeaker(); };
@@ -288,6 +307,9 @@ namespace ananas::WFS::UI
 
         auto top = bounds.removeFromTop(30);
         title.setBounds(top.removeFromLeft(120));
+        loadButton.setBounds(top.removeFromRight(130).reduced(2));
+        saveButton.setBounds(top.removeFromRight(130).reduced(2));
+        top.removeFromRight(10);
         convertButton.setBounds(top.removeFromRight(220).reduced(2));
         top.removeFromRight(10);
         layoutModeSelector.setBounds(top.removeFromRight(140).reduced(2));
@@ -375,27 +397,98 @@ namespace ananas::WFS::UI
         resized();
     }
 
-    void SpeakerTableComponent::confirmConvertToCustomLayout()
+    void SpeakerTableComponent::confirmReplacingCustomLayout(const juce::String &message, std::function<void()> replace)
     {
         if (customLayout.getLayout().getSpeakers().empty()) {
-            if (onConvertToCustomLayout) onConvertToCustomLayout();
+            replace();
             return;
         }
 
         const auto options = juce::MessageBoxOptions()
                 .withIconType(juce::MessageBoxIconType::QuestionIcon)
                 .withTitle("Replace the custom layout?")
-                .withMessage("The custom layout's speakers will be replaced by those of the linear array.")
+                .withMessage(message)
                 .withButton("Replace")
                 .withButton("Cancel")
                 .withAssociatedComponent(this);
 
-        juce::AlertWindow::showAsync(options, [safeThis = juce::Component::SafePointer{this}](const int result)
+        juce::AlertWindow::showAsync(options, [safeThis = juce::Component::SafePointer{this},
+                                               action = std::move(replace)](const int result)
         {
             // The first button returns 1.
-            if (result == 1 && safeThis != nullptr && safeThis->onConvertToCustomLayout) {
-                safeThis->onConvertToCustomLayout();
+            if (result == 1 && safeThis != nullptr) {
+                action();
             }
+        });
+    }
+
+    void SpeakerTableComponent::saveLayout()
+    {
+        fileChooser = std::make_unique<juce::FileChooser>(
+            "Save speaker layout",
+            juce::File::getSpecialLocation(juce::File::userDocumentsDirectory).getChildFile("speaker-layout.json"),
+            "*.json");
+
+        const auto flags = juce::FileBrowserComponent::saveMode
+                           | juce::FileBrowserComponent::canSelectFiles
+                           | juce::FileBrowserComponent::warnAboutOverwriting;
+
+        fileChooser->launchAsync(flags, [safeThis = juce::Component::SafePointer{this}](const juce::FileChooser &chooser)
+        {
+            const auto file = chooser.getResult();
+            if (safeThis == nullptr || file == juce::File{} || !safeThis->getLayoutToSave) return;
+
+            const auto json = LayoutFile::toJson(safeThis->getLayoutToSave());
+            if (!file.withFileExtension("json").replaceWithText(json)) {
+                juce::AlertWindow::showAsync(juce::MessageBoxOptions::makeOptionsOk(
+                                                 juce::MessageBoxIconType::WarningIcon,
+                                                 "Couldn't save the speaker layout",
+                                                 "Writing " + file.getFullPathName() + " failed."),
+                                             nullptr);
+            }
+        });
+    }
+
+    void SpeakerTableComponent::loadLayout()
+    {
+        fileChooser = std::make_unique<juce::FileChooser>(
+            "Load speaker layout",
+            juce::File::getSpecialLocation(juce::File::userDocumentsDirectory),
+            "*.json");
+
+        const auto flags = juce::FileBrowserComponent::openMode | juce::FileBrowserComponent::canSelectFiles;
+
+        fileChooser->launchAsync(flags, [safeThis = juce::Component::SafePointer{this}](const juce::FileChooser &chooser)
+        {
+            const auto file = chooser.getResult();
+            if (safeThis == nullptr || file == juce::File{}) return;
+
+            auto result = LayoutFile::fromJson(file.loadFileAsString());
+
+            if (!result.wasLoaded()) {
+                juce::AlertWindow::showAsync(juce::MessageBoxOptions::makeOptionsOk(
+                                                 juce::MessageBoxIconType::WarningIcon,
+                                                 "Couldn't load " + file.getFileName(),
+                                                 result.errors.joinIntoString("\n")),
+                                             nullptr);
+                return;
+            }
+
+            safeThis->confirmReplacingCustomLayout(
+                "The custom layout's speakers will be replaced by those in " + file.getFileName() + ".",
+                [safeThis, speakers = std::move(result.speakers), warnings = result.warnings, name = file.getFileName()]
+                {
+                    if (safeThis == nullptr || !safeThis->onLayoutLoaded) return;
+                    safeThis->onLayoutLoaded(speakers);
+
+                    if (!warnings.isEmpty()) {
+                        juce::AlertWindow::showAsync(juce::MessageBoxOptions::makeOptionsOk(
+                                                         juce::MessageBoxIconType::InfoIcon,
+                                                         "Loaded " + name,
+                                                         warnings.joinIntoString("\n")),
+                                                     nullptr);
+                    }
+                });
         });
     }
 

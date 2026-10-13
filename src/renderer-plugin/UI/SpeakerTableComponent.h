@@ -26,7 +26,9 @@ namespace ananas::WFS::UI
                               juce::ValueTree &persistentTree,
                               CustomLayout &customLayout,
                               std::function<void(LayoutMode)> onLayoutModeSelected,
-                              std::function<void()> onConvertToCustomLayout);
+                              std::function<void()> onConvertToCustomLayout,
+                              std::function<const SpeakerLayout &()> getLayoutToSave,
+                              std::function<void(std::vector<Speaker>)> onLayoutLoaded);
 
         ~SpeakerTableComponent() override;
 
@@ -103,11 +105,21 @@ namespace ananas::WFS::UI
 
         void update();
 
-        void confirmConvertToCustomLayout();
+        // Runs `replace` right away if the custom layout is empty, otherwise
+        // after asking.
+        void confirmReplacingCustomLayout(const juce::String &message, std::function<void()> replace);
+
+        void saveLayout();
+
+        void loadLayout();
 
         CustomLayout &customLayout;
         std::function<void(LayoutMode)> onLayoutModeSelected;
         std::function<void()> onConvertToCustomLayout;
+        std::function<const SpeakerLayout &()> getLayoutToSave;
+        std::function<void(std::vector<Speaker>)> onLayoutLoaded;
+        // Kept while its dialog is open.
+        std::unique_ptr<juce::FileChooser> fileChooser;
 
         juce::ValueTree speakerLayoutNode;
         juce::ValueTree layoutNode;
@@ -117,6 +129,8 @@ namespace ananas::WFS::UI
         juce::Label layoutModeLabel;
         juce::ComboBox layoutModeSelector;
         juce::TextButton convertButton;
+        juce::TextButton saveButton;
+        juce::TextButton loadButton;
         juce::TextButton addSpeakerButton;
         juce::TextButton removeSpeakersButton;
         Table table;

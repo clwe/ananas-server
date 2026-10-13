@@ -97,6 +97,13 @@ public:
     // layout, replacing what it had, and switches to it.
     void convertToCustomLayout();
 
+    // Replaces the custom layout's speakers, e.g. with a loaded file, and
+    // switches to it.
+    void loadCustomLayout(std::vector<ananas::WFS::Speaker> speakers);
+
+    // The speakers the renderers use now, from either layout.
+    [[nodiscard]] const ananas::WFS::SpeakerLayout &getSpeakerLayout() const;
+
 private:
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(PluginProcessor)
 
@@ -167,6 +174,8 @@ private:
     ananas::WFS::LinearArraySetup linearArraySetup;
     ananas::WFS::CustomLayout customLayout;
     ananas::WFS::LayoutMode layoutMode = ananas::WFS::LayoutMode::linearArray;
+    // The speakers in use, as of the last updateRenderLayout().
+    ananas::WFS::SpeakerLayout speakerLayout;
 
     struct SentPositions
     {
