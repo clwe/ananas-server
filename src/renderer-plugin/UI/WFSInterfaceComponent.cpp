@@ -48,7 +48,7 @@ namespace ananas::WFS::UI
         // Display the speaker spacing selector.
         addAndMakeVisible(speakerSpacingLabel);
         speakerSpacingLabel.attachToComponent(&speakerSpacingSlider, true);
-        speakerSpacingLabel.setText("Speaker Spacing [m]", juce::dontSendNotification);
+        speakerSpacingLabel.setText("Speaker Spacing (m)", juce::dontSendNotification);
         speakerSpacingLabel.setJustificationType(juce::Justification::centredRight);
 
         addAndMakeVisible(speakerSpacingSlider);

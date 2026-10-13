@@ -4,6 +4,7 @@
 #include "PluginProcessor.h"
 #include <NetworkOverviewComponent.h>
 #include "UI/WFSInterfaceComponent.h"
+#include "UI/SpeakerTableComponent.h"
 #include "UI/WfsLookAndFeel.h"
 
 class PluginEditor final : public juce::AudioProcessorEditor,
@@ -38,6 +39,7 @@ private:
     juce::TabbedComponent tabbedComponent{juce::TabbedButtonBar::TabsAtTop};
     ananas::UI::NetworkOverviewComponent networkOverview;
     ananas::WFS::UI::WFSInterfaceComponent wfsInterface;
+    ananas::WFS::UI::SpeakerTableComponent speakerTable;
     juce::ApplicationCommandManager commandManager;
 };
 

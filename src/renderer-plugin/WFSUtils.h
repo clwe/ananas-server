@@ -13,7 +13,9 @@ namespace ananas::WFS
         SwitchToWfsTab = 0x1001,
         SwitchToNetworkTab = 0x1002,
         ToggleModuleSelectorDisplay = 0x1003,
-        RevealModuleSelector = 0x1004
+        // RevealModuleSelector + 0 … 9
+        RevealModuleSelector = 0x1004,
+        SwitchToSpeakersTab = 0x1010
     };
 
     class Constants
@@ -170,12 +172,15 @@ namespace ananas::WFS
     public:
         inline static const juce::StringRef WfsTabName{"WFS Control"};
         inline static const juce::StringRef NetworkTabName{"Network Overview"};
+        inline static const juce::StringRef SpeakersTabName{"Speakers"};
 
         inline static const juce::StringRef TabsCommandCategoryName{"Tabs"};
         inline static const juce::StringRef SwitchToWfsTabShortName{"WFS Control tab"};
         inline static const juce::StringRef SwitchToWfsTabDescription{"Switches to the WFS Control tab"};
         inline static const juce::StringRef SwitchToNetworkTabShortName{"Network overview tab"};
         inline static const juce::StringRef SwitchToNetworkTabDescription{"Switches to the Network Overview tab"};
+        inline static const juce::StringRef SwitchToSpeakersTabShortName{"Speakers tab"};
+        inline static const juce::StringRef SwitchToSpeakersTabDescription{"Switches to the Speakers tab"};
 
         inline static const juce::StringRef OptionsCommandCategoryName{"Options"};
         inline static const juce::StringRef ToggleModuleSelectorsShortName{"Toggle module selectors"};
@@ -309,6 +314,7 @@ namespace ananas::WFS
         public:
             constexpr static int SwitchToWfsTabKeycode{'['};
             constexpr static int SwitchToNetworkTabKeycode{']'};
+            constexpr static int SwitchToSpeakersTabKeycode{'\\'};
             constexpr static int ToggleModuleSelectorsKeycode{'m'};
             constexpr static int RevealModuleSelectorListKeycode{'1'};
         };

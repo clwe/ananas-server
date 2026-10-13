@@ -22,7 +22,8 @@ PluginEditor::PluginEditor(PluginProcessor &p)
               getProcessor().assignModuleToSlot(slot, moduleIP);
           },
           getProcessor().getLinearArraySetup()
-      )
+      ),
+      speakerTable(getProcessor().getDynamicTree())
 {
     juce::Desktop::getInstance().setDefaultLookAndFeel(&lookAndFeel);
 
@@ -39,6 +40,12 @@ PluginEditor::PluginEditor(PluginProcessor &p)
         ananas::WFS::Strings::NetworkTabName,
         juce::Colours::whitesmoke,
         &networkOverview,
+        false
+    );
+    tabbedComponent.addTab(
+        ananas::WFS::Strings::SpeakersTabName,
+        juce::Colours::whitesmoke,
+        &speakerTable,
         false
     );
     lookAndFeel.setNumberOfTabs(tabbedComponent.getNumTabs());
@@ -89,6 +96,7 @@ void PluginEditor::getAllCommands(juce::Array<int> &commands)
     commands.addArray({
         ananas::WFS::SwitchToWfsTab,
         ananas::WFS::SwitchToNetworkTab,
+        ananas::WFS::SwitchToSpeakersTab,
         ananas::WFS::ToggleModuleSelectorDisplay
     });
 
@@ -116,6 +124,15 @@ void PluginEditor::getCommandInfo(const juce::CommandID commandID, juce::Applica
                 ananas::WFS::Strings::TabsCommandCategoryName,
                 0);
             result.addDefaultKeypress(ananas::WFS::UI::Shortcuts::SwitchToNetworkTabKeycode, juce::ModifierKeys::noModifiers);
+            break;
+
+        case ananas::WFS::SwitchToSpeakersTab:
+            result.setInfo(
+                ananas::WFS::Strings::SwitchToSpeakersTabShortName,
+                ananas::WFS::Strings::SwitchToSpeakersTabDescription,
+                ananas::WFS::Strings::TabsCommandCategoryName,
+                0);
+            result.addDefaultKeypress(ananas::WFS::UI::Shortcuts::SwitchToSpeakersTabKeycode, juce::ModifierKeys::noModifiers);
             break;
 
         case ananas::WFS::ToggleModuleSelectorDisplay:
@@ -154,6 +171,10 @@ bool PluginEditor::perform(const InvocationInfo &info)
 
         case ananas::WFS::SwitchToNetworkTab:
             tabbedComponent.setCurrentTabIndex(1);
+            return true;
+
+        case ananas::WFS::SwitchToSpeakersTab:
+            tabbedComponent.setCurrentTabIndex(2);
             return true;
 
         case ananas::WFS::ToggleModuleSelectorDisplay: {
