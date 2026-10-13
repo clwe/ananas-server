@@ -66,6 +66,18 @@ Positions stay on the server; the firmware never stores or hardcodes them.
       listening area, and a listener or sources placed where the layout
       can't render them. Outputs without a speaker must be muted (needs the
       protocol extension below). Saving to a file comes afterwards (below).
+      - Done: the Speakers tab shows the speakers in use with the problems
+        `checkLayout` finds (no module, unknown or disconnected module,
+        missing output, output used twice or unused, same position, WFS
+        speaker off y = 0). With the custom layout, position, module and
+        output are edited in the table, and speakers added and removed;
+        "Copy linear array to custom" starts it from the linear array.
+      - Still open: z and orientation; the top-down view; the checks for
+        speakers facing away and for the listener or sources.
+      - **Bulk assignment:** select several rows, choose a module, and the
+        selected speakers get its outputs 0, 1, 2… in row order (what a
+        slot does in the linear array). Assigning a 16-output module one
+        speaker at a time is tedious.
 - [x] **The current linear array becomes a generator** ("N modules, spacing
       d") that produces a `SpeakerLayout`, so the WFS workflow stays as it
       is. `/ss` keeps sending each module the positions of its outputs.
