@@ -90,6 +90,7 @@ namespace ananas::Ambisonics
     {
         outerSpeakerX = layout.outerSpeakerX;
         speakerPositions = layout.getSpeakerPositions(::ananas::Utils::FirmwareType::ambisonicsModule);
+        speakerHeights = layout.getSpeakerHeights(::ananas::Utils::FirmwareType::ambisonicsModule);
     }
 
     void AmbisonicsRenderer::modulesChanged()
@@ -103,11 +104,14 @@ namespace ananas::Ambisonics
         sendControlMessages(std::exchange(shouldResendControlMessages, false));
     }
 
-    float AmbisonicsRenderer::computeRmax(const juce::Point<float> listener, const std::vector<juce::Point<float>> &speakers)
+    float AmbisonicsRenderer::computeRmax(const juce::Point<float> listener, const std::vector<juce::Point<float>> &speakers,
+                                          const std::vector<float> &heights)
     {
         auto rmax{-1.f};
-        for (const auto &s: speakers) {
-            rmax = std::max(rmax, s.getDistanceFrom(listener));
+        for (size_t i{0}; i < speakers.size(); ++i) {
+            const auto horizontal{speakers[i].getDistanceFrom(listener)};
+            const auto height{i < heights.size() ? heights[i] : 0.f};
+            rmax = std::max(rmax, std::sqrt(horizontal * horizontal + height * height));
         }
         return rmax;
     }
@@ -121,6 +125,6 @@ namespace ananas::Ambisonics
     void AmbisonicsRenderer::sendControlMessages(const bool force)
     {
         const auto listener{getListenerMetres()};
-        controlMessenger.send(listener, computeRmax(listener, speakerPositions), force);
+        controlMessenger.send(listener, computeRmax(listener, speakerPositions, speakerHeights), force);
     }
 }

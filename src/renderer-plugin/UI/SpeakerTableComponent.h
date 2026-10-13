@@ -59,6 +59,8 @@ namespace ananas::WFS::UI
                 int index = 0;
                 float x = 0.f;
                 float y = 0.f;
+                float z = 0.f;
+                Direction facing;
                 juce::String moduleIp;
                 int output = -1;
                 // Worst LayoutProblem::Severity, as an int; -1 if none.
@@ -89,6 +91,8 @@ namespace ananas::WFS::UI
 
             // Edits, by speaker index.
             std::function<void(int index, juce::Point<float> position)> onPositionEdited;
+            std::function<void(int index, float z)> onHeightEdited;
+            std::function<void(int index, Direction facing)> onFacingEdited;
             std::function<void(int index, const juce::String &moduleIp, int output)> onModuleEdited;
 
         private:

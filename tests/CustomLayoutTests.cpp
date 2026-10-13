@@ -183,6 +183,52 @@ public:
             expectEquals(counter.deliver(), 2);
         }
 
+        beginTest("Facing directions from and to angles");
+        {
+            using ananas::WFS::Direction;
+            const auto towardsListener = Direction::fromAngles(0.f, 0.f);
+            expectWithinAbsoluteError(towardsListener.y, -1.f, 1e-6f);
+            // Counter-clockwise seen from above: 90 degrees faces +x.
+            const auto right = Direction::fromAngles(90.f, 0.f);
+            expectWithinAbsoluteError(right.x, 1.f, 1e-6f);
+            expectWithinAbsoluteError(right.y, 0.f, 1e-6f);
+            const auto up = Direction::fromAngles(0.f, 90.f);
+            expectWithinAbsoluteError(up.z, 1.f, 1e-6f);
+            expectWithinAbsoluteError(up.horizontalLength(), 0.f, 1e-6f);
+
+            const auto d = Direction::fromAngles(-135.f, 20.f);
+            expectWithinAbsoluteError(d.facingDegrees(), -135.f, 1e-3f);
+            expectWithinAbsoluteError(d.tiltDegrees(), 20.f, 1e-3f);
+
+            // No length, or not finite: the default direction.
+            expect(Direction{0.f, 0.f, 0.f}.normalised() == Direction{});
+            expect(Direction{std::numeric_limits<float>::quiet_NaN(), 0.f, 0.f}.normalised() == Direction{});
+        }
+
+        beginTest("Height and facing: edited, kept valid, saved");
+        {
+            using ananas::WFS::Direction;
+            CustomLayout layout;
+            layout.addSpeaker();
+            expect(speakersOf(layout)[0].facing == Direction{});
+
+            layout.setHeight(0, 1.5f);
+            layout.setFacing(0, {2.f, 0.f, 0.f});
+            expect(juce::exactlyEqual(speakersOf(layout)[0].z, 1.5f));
+            expect(speakersOf(layout)[0].facing == Direction{1.f, 0.f, 0.f});
+
+            layout.setHeight(0, std::numeric_limits<float>::infinity());
+            layout.setFacing(0, {0.f, 0.f, 0.f});
+            expect(juce::exactlyEqual(speakersOf(layout)[0].z, 0.f));
+            expect(speakersOf(layout)[0].facing == Direction{});
+
+            layout.setHeight(0, 2.f);
+            layout.setFacing(0, Direction::fromAngles(45.f, -30.f));
+            CustomLayout restored;
+            restored.fromValueTree(layout.toValueTree());
+            expect(speakersOf(restored) == speakersOf(layout));
+        }
+
         beginTest("Layout mode as saved text; unknown text means the linear array");
         {
             using ananas::WFS::LayoutMode;

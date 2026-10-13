@@ -228,6 +228,11 @@ namespace ananas::WFS
         inline static const juce::Identifier SpeakerIndexPropertyID{"index"};
         inline static const juce::Identifier SpeakerXPropertyID{"x"};
         inline static const juce::Identifier SpeakerYPropertyID{"y"};
+        inline static const juce::Identifier SpeakerZPropertyID{"z"};
+        // The direction the speaker faces, a unit vector.
+        inline static const juce::Identifier SpeakerFacingXPropertyID{"nx"};
+        inline static const juce::Identifier SpeakerFacingYPropertyID{"ny"};
+        inline static const juce::Identifier SpeakerFacingZPropertyID{"nz"};
         inline static const juce::Identifier SpeakerModuleIpPropertyID{"moduleIp"};
         inline static const juce::Identifier SpeakerOutputPropertyID{"output"};
         // Worst LayoutProblem::Severity of the speaker's problems, as an int;

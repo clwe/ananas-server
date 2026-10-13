@@ -32,6 +32,10 @@ namespace ananas::WFS::LayoutFile
             auto *speaker = new juce::DynamicObject;
             speaker->setProperty("x", rounded(s.position.x));
             speaker->setProperty("y", rounded(s.position.y));
+            speaker->setProperty("z", rounded(s.z));
+            speaker->setProperty("facing", juce::Array<juce::var>{rounded(s.facing.x),
+                                                                  rounded(s.facing.y),
+                                                                  rounded(s.facing.z)});
             if (s.moduleIp.isNotEmpty()) {
                 speaker->setProperty("module", s.moduleIp);
                 speaker->setProperty("output", s.output);
@@ -89,7 +93,6 @@ namespace ananas::WFS::LayoutFile
         }
 
         std::vector<Speaker> loaded;
-        auto ignoresZ = false;
 
         for (int i = 0; i < speakers->size(); ++i) {
             const auto &entry = speakers->getReference(i);
@@ -116,15 +119,30 @@ namespace ananas::WFS::LayoutFile
                 s.output = entry["output"];
             }
 
-            if (isNumber(entry["z"]) && !juce::exactlyEqual(static_cast<double>(entry["z"]), 0.0)) {
-                ignoresZ = true;
+            if (entry.hasProperty("z")) {
+                if (!isNumber(entry["z"])) {
+                    result.errors.add(name + " needs a number for \"z\".");
+                    continue;
+                }
+                s.z = entry["z"];
+            }
+
+            if (entry.hasProperty("facing")) {
+                const auto *facing = entry["facing"].getArray();
+                if (facing == nullptr || facing->size() != 3
+                    || !isNumber((*facing)[0]) || !isNumber((*facing)[1]) || !isNumber((*facing)[2])) {
+                    result.errors.add(name + " needs three numbers for \"facing\" ([x, y, z]).");
+                    continue;
+                }
+                const Direction direction{(*facing)[0], (*facing)[1], (*facing)[2]};
+                if (direction.horizontalLength() < 1e-6f && std::abs(direction.z) < 1e-6f) {
+                    result.errors.add(name + " has no direction in \"facing\" (all zeros).");
+                    continue;
+                }
+                s.facing = direction.normalised();
             }
 
             loaded.push_back(std::move(s));
-        }
-
-        if (ignoresZ) {
-            result.warnings.add("Heights (\"z\") are ignored for now; all speakers are placed at z = 0.");
         }
 
         if (result.errors.isEmpty()) {

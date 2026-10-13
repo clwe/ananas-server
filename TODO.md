@@ -167,23 +167,39 @@ Positions stay on the server; the firmware never stores or hardcodes them.
         silently clipped today. The handover asks for a larger range.
       - **Server side, once the firmware has it:**
         - `Packet.h`: the two announcement fields; `ModuleInfo` stores them.
+        - **First, merge the per-output data in `RenderLayout`.** Today
+          `modulePositions` (2-D points) and `moduleHeights` are two
+          parallel maps that have to be kept in sync by hand, and
+          `getSpeakerPositions` / `getSpeakerHeights` only match because
+          they iterate in the same order. Replace both with one entry per
+          module output, e.g.
+          `std::map<juce::String, std::vector<OutputGeometry>> moduleOutputs`
+          with `OutputGeometry { position; z; facing; isUsed; }`: exactly
+          what `/ss/<j>` sends (x, y, z, facing, gain = isUsed). Touches
+          `compute`, `sendSpeakerPositions` (its "last sent" comparison then
+          covers z, facing and mute too), `isEchoedByModule`,
+          `getSpeakerPositions` and the Ambisonics renderer, and their
+          tests; doing it here means those places change once.
         - `RenderLayout::compute` records, per module output, whether a
-          speaker uses it, its z and orientation.
+          speaker uses it, its z and orientation (in `OutputGeometry`).
         - `sendSpeakerPositions`: for modules on protocol 1, one bundle with
           `/ss/id` and `/ss/<j>` for every output (gain 0 for unused ones),
           resent when the echoed id differs; protocol 0 unchanged.
-      - **Server side, can be done now (independent of the firmware):**
-        - Give `Speaker` z and an orientation as a 3-D unit vector
-          (default `(0, -1, 0)`, facing the listener), in `CustomLayout`, the
-          speaker table (columns), the JSON format (then z loads instead of
-          being dropped) and `generateLinearArray`. The table can start with
-          a horizontal angle and add tilt later; the data is 3-D from the
-          start.
-        - `checkLayout`: warn about WFS speakers beyond ±2.25 m (clipped by
-          the current firmware), about WFS speakers pointing (almost)
-          straight up or down (no horizontal direction), and later about
-          speakers facing away from the listening area.
-        - The Ambisonics renderer's rmax from 3-D distances once z exists.
+      - **Server side, independent of the firmware: done.**
+        - `Speaker` has a height `z` and a facing direction (`Direction`, a
+          3-D unit vector, default `(0, -1, 0)` towards the listener), in
+          `CustomLayout`, the JSON format (`"z"`, `"facing": [x, y, z]`,
+          both optional) and the mirror for the UI. The speaker table shows
+          and, with the custom layout, edits z (m), facing (degrees, 0
+          towards the listener, counter-clockwise seen from above) and tilt
+          (degrees above the horizontal).
+        - `checkLayout` warns about WFS speakers beyond ±2.25 m (clipped by
+          the current firmware) and WFS speakers pointing (almost) straight
+          up or down, and notes that WFS ignores heights.
+        - The Ambisonics renderer's rmax uses 3-D distances
+          (`RenderLayout::moduleHeights`).
+        - Still open: a warning for speakers facing away from the listening
+          area.
 
 ## Ambisonics
 

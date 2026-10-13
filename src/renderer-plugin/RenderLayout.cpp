@@ -11,6 +11,7 @@ namespace ananas::WFS
         // Unassigned modules sit at the origin.
         for (const auto &m: modules) {
             layout.modulePositions[m.ip] = std::vector<juce::Point<float>>(static_cast<size_t>(m.info.numSpeakers));
+            layout.moduleHeights[m.ip] = std::vector<float>(static_cast<size_t>(m.info.numSpeakers));
             modulesByIp[m.ip] = &m;
         }
 
@@ -48,6 +49,7 @@ namespace ananas::WFS
             if (s.output < 0 || s.output >= numOutputs) continue;
 
             positions[static_cast<size_t>(s.output)] = s.position;
+            layout.moduleHeights[s.moduleIp][static_cast<size_t>(s.output)] = s.z;
             layout.assignedModuleTypes[s.moduleIp] = modulesByIp[s.moduleIp]->info.firmwareType;
         }
 
@@ -79,6 +81,20 @@ namespace ananas::WFS
         }
 
         return positions;
+    }
+
+    std::vector<float> RenderLayout::getSpeakerHeights(const ::ananas::Utils::FirmwareType firmwareType) const
+    {
+        std::vector<float> heights;
+
+        for (const auto &[ip, type]: assignedModuleTypes) {
+            if (type == firmwareType) {
+                const auto &h{moduleHeights.at(ip)};
+                heights.insert(heights.end(), h.begin(), h.end());
+            }
+        }
+
+        return heights;
     }
 
     juce::var RenderLayout::toVar() const

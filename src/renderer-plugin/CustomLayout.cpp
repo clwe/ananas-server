@@ -10,6 +10,8 @@ namespace ananas::WFS
         {
             if (!std::isfinite(s.position.x)) s.position.x = 0.f;
             if (!std::isfinite(s.position.y)) s.position.y = 0.f;
+            if (!std::isfinite(s.z)) s.z = 0.f;
+            s.facing = s.facing.normalised();
             if (s.moduleIp.isEmpty()) s.output = -1;
             return s;
         }
@@ -61,6 +63,24 @@ namespace ananas::WFS
         apply(std::move(speakers));
     }
 
+    void CustomLayout::setHeight(const int index, const float z)
+    {
+        if (!isValidIndex(index)) return;
+
+        auto speakers = layout.getSpeakers();
+        speakers[static_cast<size_t>(index)].z = z;
+        apply(std::move(speakers));
+    }
+
+    void CustomLayout::setFacing(const int index, const Direction facing)
+    {
+        if (!isValidIndex(index)) return;
+
+        auto speakers = layout.getSpeakers();
+        speakers[static_cast<size_t>(index)].facing = facing;
+        apply(std::move(speakers));
+    }
+
     void CustomLayout::setModule(const int index, const juce::String &moduleIp, const int output)
     {
         if (!isValidIndex(index)) return;
@@ -83,6 +103,10 @@ namespace ananas::WFS
             speaker.setProperty(Identifiers::SpeakerIndexPropertyID, static_cast<int>(i), nullptr);
             speaker.setProperty(Identifiers::SpeakerXPropertyID, s.position.x, nullptr);
             speaker.setProperty(Identifiers::SpeakerYPropertyID, s.position.y, nullptr);
+            speaker.setProperty(Identifiers::SpeakerZPropertyID, s.z, nullptr);
+            speaker.setProperty(Identifiers::SpeakerFacingXPropertyID, s.facing.x, nullptr);
+            speaker.setProperty(Identifiers::SpeakerFacingYPropertyID, s.facing.y, nullptr);
+            speaker.setProperty(Identifiers::SpeakerFacingZPropertyID, s.facing.z, nullptr);
             speaker.setProperty(Identifiers::SpeakerModuleIpPropertyID, s.moduleIp, nullptr);
             speaker.setProperty(Identifiers::SpeakerOutputPropertyID, s.output, nullptr);
             tree.addChild(speaker, -1, nullptr);
@@ -103,6 +127,12 @@ namespace ananas::WFS
 
             Speaker s;
             s.position = {child[Identifiers::SpeakerXPropertyID], child[Identifiers::SpeakerYPropertyID]};
+            // Saved before heights and directions existed: z = 0, facing the listener.
+            s.z = child.getProperty(Identifiers::SpeakerZPropertyID, 0.f);
+            const Direction defaultFacing;
+            s.facing = {child.getProperty(Identifiers::SpeakerFacingXPropertyID, defaultFacing.x),
+                        child.getProperty(Identifiers::SpeakerFacingYPropertyID, defaultFacing.y),
+                        child.getProperty(Identifiers::SpeakerFacingZPropertyID, defaultFacing.z)};
             s.moduleIp = child[Identifiers::SpeakerModuleIpPropertyID].toString();
             s.output = child.getProperty(Identifiers::SpeakerOutputPropertyID, -1);
             indexed.emplace_back(child.getProperty(Identifiers::SpeakerIndexPropertyID, static_cast<int>(indexed.size())), s);

@@ -177,6 +177,29 @@ public:
             expectEquals(count(problems, Type::wfsSpeakerOffArrayLine), 1);
         }
 
+        beginTest("WFS range, direction and height");
+        {
+            using ananas::WFS::Direction;
+            const auto ambisonics = ananas::Utils::FirmwareType::ambisonicsModule;
+            const auto layout = makeLayout({{{3.f, 0.f}, "wfs", 0},                                   // beyond 2.25 m
+                                            {{0.f, 0.f}, "wfs", 1, 0.f, Direction::fromAngles(0.f, 89.f)}, // pointing up
+                                            {{.2f, 0.f}, "wfs", 2, 1.f},                              // raised
+                                            {{5.f, -3.f}, "ambi", 0, 2.f, Direction{0.f, 0.f, 1.f}}});
+            const auto problems = checkLayout(layout, {makeModule("wfs", 3), makeModule("ambi", 1, true, ambisonics)});
+
+            expect(has(problems, Type::wfsSpeakerOutOfRange, 0));
+            expect(has(problems, Type::wfsSpeakerNotHorizontal, 1));
+            expect(has(problems, Type::wfsHeightIgnored, 2));
+            // Ambisonics speakers may be anywhere, at any height and angle.
+            for (const auto &p: problems) {
+                expect(p.speakerIndex != 3);
+            }
+            // The height is information, not a warning.
+            for (const auto &p: problems) {
+                if (p.type == Type::wfsHeightIgnored) expect(p.severity == Severity::info);
+            }
+        }
+
         beginTest("Tree for the UI: one child per speaker, with its worst severity and its problems");
         {
             using ananas::WFS::Identifiers;

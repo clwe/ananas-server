@@ -31,6 +31,13 @@ public:
             const std::vector<juce::Point<float>> speakers{{-3.f, 0.f}, {0.f, 0.f}, {1.f, 0.f}};
             expectWithinAbsoluteError(AmbisonicsRenderer::computeRmax(listener, speakers), std::sqrt(13.f), 1e-6f);
         }
+
+        beginTest("rmax counts the speakers' heights");
+        {
+            // (1, 0) is sqrt(5) away horizontally; 2 m up makes it 3 m.
+            const std::vector<juce::Point<float>> speakers{{0.f, 0.f}, {1.f, 0.f}};
+            expectWithinAbsoluteError(AmbisonicsRenderer::computeRmax(listener, speakers, {0.f, 2.f}), 3.f, 1e-6f);
+        }
     }
 };
 

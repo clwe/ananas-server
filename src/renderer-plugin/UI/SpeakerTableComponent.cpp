@@ -18,6 +18,9 @@ namespace ananas::WFS::UI
             speakerColumnId = 1,
             xColumnId,
             yColumnId,
+            zColumnId,
+            facingColumnId,
+            tiltColumnId,
             moduleColumnId,
             outputColumnId,
             problemsColumnId,
@@ -26,6 +29,12 @@ namespace ananas::WFS::UI
         const TableColumns::ColumnHeader SpeakerColumn{speakerColumnId, "Speaker", 70, 30, -1, ColumnFlags, juce::Justification::centred};
         const TableColumns::ColumnHeader XColumn{xColumnId, "x (m)", 80, 30, -1, ColumnFlags, juce::Justification::centredRight};
         const TableColumns::ColumnHeader YColumn{yColumnId, "y (m)", 80, 30, -1, ColumnFlags, juce::Justification::centredRight};
+        const TableColumns::ColumnHeader ZColumn{zColumnId, "z (m)", 80, 30, -1, ColumnFlags, juce::Justification::centredRight};
+        // Non-ASCII, so from UTF-8 (a plain char* label must be ASCII).
+        const auto FacingLabel = juce::String::fromUTF8("Facing (\xc2\xb0)");
+        const auto TiltLabel = juce::String::fromUTF8("Tilt (\xc2\xb0)");
+        const TableColumns::ColumnHeader FacingColumn{facingColumnId, FacingLabel, 85, 30, -1, ColumnFlags, juce::Justification::centredRight};
+        const TableColumns::ColumnHeader TiltColumn{tiltColumnId, TiltLabel, 75, 30, -1, ColumnFlags, juce::Justification::centredRight};
         const TableColumns::ColumnHeader ModuleColumn{moduleColumnId, "Module", 200, 30, -1, ColumnFlags, juce::Justification::centredLeft};
         const TableColumns::ColumnHeader OutputColumn{outputColumnId, "Output", 70, 30, -1, ColumnFlags, juce::Justification::centred};
         const TableColumns::ColumnHeader ProblemsColumn{problemsColumnId, "Problems", 400, 30, -1, ColumnFlags, juce::Justification::centredLeft};
@@ -44,13 +53,24 @@ namespace ananas::WFS::UI
         {
             return juce::String{value, 3};
         }
+
+        juce::String formatDegrees(const float value)
+        {
+            return juce::String{value, 1};
+        }
+
+        bool isEditableColumn(const int columnId)
+        {
+            return columnId >= xColumnId && columnId <= outputColumnId;
+        }
     }
 
     //==========================================================================
     // Editable cells. JUCE reuses cell components for other rows, so each
     // cell keeps its current row, and its callbacks read it from there.
 
-    // x or y, committed on return or when the editor loses focus.
+    // A number (x, y, z in metres; facing or tilt in degrees), committed on
+    // return or when the editor loses focus.
     class SpeakerTableComponent::Table::NumberCell final : public juce::TextEditor
     {
     public:
@@ -70,25 +90,58 @@ namespace ananas::WFS::UI
             column = columnId;
             // Don't overwrite what the user is typing.
             if (hasKeyboardFocus(true)) return;
-            const auto &r = table.rows[static_cast<size_t>(row)];
-            setText(formatMetres(column == xColumnId ? r.x : r.y), juce::dontSendNotification);
+            showValue();
         }
 
     private:
+        void showValue()
+        {
+            const auto &r = table.rows[static_cast<size_t>(row)];
+            switch (column) {
+                case xColumnId: setText(formatMetres(r.x), juce::dontSendNotification);
+                    break;
+                case yColumnId: setText(formatMetres(r.y), juce::dontSendNotification);
+                    break;
+                case zColumnId: setText(formatMetres(r.z), juce::dontSendNotification);
+                    break;
+                case facingColumnId: setText(formatDegrees(r.facing.facingDegrees()), juce::dontSendNotification);
+                    break;
+                case tiltColumnId: setText(formatDegrees(r.facing.tiltDegrees()), juce::dontSendNotification);
+                    break;
+                default: break;
+            }
+        }
+
         void commit()
         {
-            if (row >= table.getNumRows() || !table.onPositionEdited) return;
+            if (row >= table.getNumRows()) return;
 
             const auto &r = table.rows[static_cast<size_t>(row)];
             const auto text = getText().trim();
             if (text.isEmpty() || !text.containsAnyOf("0123456789")) {
-                setText(formatMetres(column == xColumnId ? r.x : r.y), juce::dontSendNotification);
+                showValue();
                 return;
             }
 
             const auto value = text.getFloatValue();
-            const auto position = column == xColumnId ? juce::Point<float>{value, r.y} : juce::Point<float>{r.x, value};
-            table.onPositionEdited(r.index, position);
+            switch (column) {
+                case xColumnId:
+                    if (table.onPositionEdited) table.onPositionEdited(r.index, {value, r.y});
+                    break;
+                case yColumnId:
+                    if (table.onPositionEdited) table.onPositionEdited(r.index, {r.x, value});
+                    break;
+                case zColumnId:
+                    if (table.onHeightEdited) table.onHeightEdited(r.index, value);
+                    break;
+                case facingColumnId:
+                    if (table.onFacingEdited) table.onFacingEdited(r.index, Direction::fromAngles(value, r.facing.tiltDegrees()));
+                    break;
+                case tiltColumnId:
+                    if (table.onFacingEdited) table.onFacingEdited(r.index, Direction::fromAngles(r.facing.facingDegrees(), value));
+                    break;
+                default: break;
+            }
         }
 
         Table &table;
@@ -279,6 +332,14 @@ namespace ananas::WFS::UI
         {
             customLayout.setPosition(index, position);
         };
+        table.onHeightEdited = [this](const int index, const float z)
+        {
+            customLayout.setHeight(index, z);
+        };
+        table.onFacingEdited = [this](const int index, const Direction facing)
+        {
+            customLayout.setFacing(index, facing);
+        };
         table.onModuleEdited = [this](const int index, const juce::String &ip, const int output)
         {
             customLayout.setModule(index, ip, output);
@@ -381,6 +442,10 @@ namespace ananas::WFS::UI
             row.index = speaker[Identifiers::SpeakerIndexPropertyID];
             row.x = speaker[Identifiers::SpeakerXPropertyID];
             row.y = speaker[Identifiers::SpeakerYPropertyID];
+            row.z = speaker[Identifiers::SpeakerZPropertyID];
+            row.facing = Direction{speaker[Identifiers::SpeakerFacingXPropertyID],
+                                   speaker[Identifiers::SpeakerFacingYPropertyID],
+                                   speaker[Identifiers::SpeakerFacingZPropertyID]}.normalised();
             row.moduleIp = speaker[Identifiers::SpeakerModuleIpPropertyID].toString();
             row.output = speaker[Identifiers::SpeakerOutputPropertyID];
             row.severity = speaker[Identifiers::SpeakerSeverityPropertyID];
@@ -501,6 +566,9 @@ namespace ananas::WFS::UI
         addColumn(SpeakerColumn);
         addColumn(XColumn);
         addColumn(YColumn);
+        addColumn(ZColumn);
+        addColumn(FacingColumn);
+        addColumn(TiltColumn);
         addColumn(ModuleColumn);
         addColumn(OutputColumn);
         addColumn(ProblemsColumn);
@@ -552,7 +620,7 @@ namespace ananas::WFS::UI
         if (rowNumber >= getNumRows()) return;
 
         // Editable cells are drawn by their components.
-        if (editable && columnId >= xColumnId && columnId <= outputColumnId) return;
+        if (editable && isEditableColumn(columnId)) return;
 
         const auto &row = rows[static_cast<size_t>(rowNumber)];
         juce::String text;
@@ -563,6 +631,12 @@ namespace ananas::WFS::UI
             case xColumnId: text = formatMetres(row.x);
                 break;
             case yColumnId: text = formatMetres(row.y);
+                break;
+            case zColumnId: text = formatMetres(row.z);
+                break;
+            case facingColumnId: text = formatDegrees(row.facing.facingDegrees());
+                break;
+            case tiltColumnId: text = formatDegrees(row.facing.tiltDegrees());
                 break;
             case moduleColumnId: text = row.moduleIp.isEmpty() ? juce::String::fromUTF8("–") : row.moduleIp;
                 break;
@@ -589,14 +663,14 @@ namespace ananas::WFS::UI
                                                                            juce::Component *existing)
     {
         const auto wantsComponent = editable && rowNumber < getNumRows()
-                                    && columnId >= xColumnId && columnId <= outputColumnId;
+                                    && isEditableColumn(columnId);
 
         if (!wantsComponent) {
             delete existing;
             return nullptr;
         }
 
-        if (columnId == xColumnId || columnId == yColumnId) {
+        if (columnId != moduleColumnId && columnId != outputColumnId) {
             auto *cell = dynamic_cast<NumberCell *>(existing);
             if (cell == nullptr) {
                 delete existing;

@@ -141,6 +141,18 @@ public:
                                               {makeModule("ambi", 0, 2, 9, ambisonics).entry});
             expect(approximatelyEqual(layout.outerSpeakerX, 3.f));
         }
+
+        beginTest("Heights per output, in the same order as the positions");
+        {
+            const auto layout = computeCustom({{{-1.f, -2.f}, "ambi", 1, 2.f}, {{1.f, -2.f}, "ambi", 0, .5f}},
+                                              {makeModule("ambi", 0, 3, 9, ambisonics).entry});
+            const auto heights = layout.moduleHeights.at("ambi");
+            expectEquals(static_cast<int>(heights.size()), 3);
+            expect(approximatelyEqual(heights[0], .5f));
+            expect(approximatelyEqual(heights[1], 2.f));
+            expect(approximatelyEqual(heights[2], 0.f));
+            expect(layout.getSpeakerHeights(ambisonics) == heights);
+        }
     }
 };
 

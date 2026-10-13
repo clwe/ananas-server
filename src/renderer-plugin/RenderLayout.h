@@ -28,6 +28,9 @@ namespace ananas::WFS
         // Speaker positions for every known module. Unassigned modules get
         // (0, 0) for all speakers.
         std::map<juce::String, std::vector<juce::Point<float>>> modulePositions;
+        // Speaker heights, like modulePositions (0 for unassigned outputs).
+        // Not sent to modules yet; the protocol has no z so far.
+        std::map<juce::String, std::vector<float>> moduleHeights;
         // Firmware type of each module referened by at least one speaker.
         std::map<juce::String, ::ananas::Utils::FirmwareType> assignedModuleTypes;
 
@@ -35,6 +38,11 @@ namespace ananas::WFS
          * Positions of the speakers of all assigned modules of one type.
          */
         [[nodiscard]] std::vector<juce::Point<float>> getSpeakerPositions(::ananas::Utils::FirmwareType firmwareType) const;
+
+        /**
+         * Heights of the same speakers, in the same order.
+         */
+        [[nodiscard]] std::vector<float> getSpeakerHeights(::ananas::Utils::FirmwareType firmwareType) const;
     };
 }
 

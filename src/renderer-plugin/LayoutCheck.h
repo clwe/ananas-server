@@ -30,6 +30,16 @@ namespace ananas::WFS
             // straight array on y = 0, facing the listener, until speaker
             // orientation is sent too.
             wfsSpeakerOffArrayLine,
+            // A WFS module's speaker further from the centre than the WFS
+            // firmware accepts (Constants::MaxXMetres, for x and y); the
+            // firmware clips its position.
+            wfsSpeakerOutOfRange,
+            // A WFS module's speaker pointing (almost) straight up or down:
+            // WFS needs a horizontal direction.
+            wfsSpeakerNotHorizontal,
+            // A WFS module's speaker above or below the listening plane; WFS
+            // is horizontal and ignores the height.
+            wfsHeightIgnored,
             // A module that drives speakers has an output no speaker uses;
             // it still plays, at the origin. Not tied to one speaker.
             outputUnused,

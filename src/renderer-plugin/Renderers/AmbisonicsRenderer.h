@@ -39,10 +39,13 @@ namespace ananas::Ambisonics
         void modulesChanged() override;
 
         /**
-         * Largest distance from the listener to any of the speakers.
+         * Largest distance from the listener to any of the speakers, in 3-D:
+         * the listener is in the plane z = 0, the speakers at `heights` (in
+         * the same order as `speakers`; missing heights count as 0).
          * @return -1 if there are no speakers.
          */
-        static float computeRmax(juce::Point<float> listener, const std::vector<juce::Point<float>> &speakers);
+        static float computeRmax(juce::Point<float> listener, const std::vector<juce::Point<float>> &speakers,
+                                 const std::vector<float> &heights = {});
 
         /**
          * Azimuth of a source as seen from the listener, in radians,
@@ -71,6 +74,7 @@ namespace ananas::Ambisonics
         std::atomic<float> outerSpeakerX{1.f};
         // Message thread only.
         std::vector<juce::Point<float>> speakerPositions;
+        std::vector<float> speakerHeights;
         bool shouldResendControlMessages{false};
         // Audio thread only: the gains used at the end of the previous block.
         std::array<std::array<float, NumChannels>, NumSources> gains{};

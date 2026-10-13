@@ -9,6 +9,12 @@ namespace ananas::WFS
         constexpr float SamePositionToleranceMetres = .01f;
         // Further than this from y = 0, a WFS speaker is off the array line.
         constexpr float ArrayLineToleranceMetres = .01f;
+        // Above or below the listening plane by more than this, a speaker's
+        // height counts.
+        constexpr float HeightToleranceMetres = .01f;
+        // A facing direction with less of a horizontal part than this
+        // (about 84 degrees of tilt) gives WFS no usable direction.
+        constexpr float MinHorizontalFacing = .1f;
 
         juce::String outputName(const Speaker &s)
         {
@@ -55,10 +61,25 @@ namespace ananas::WFS
                         problems.push_back({Type::moduleNotConnected, Severity::warning, index, s.moduleIp,
                                             "Module " + s.moduleIp + " isn't connected."});
                     }
-                    if (module.info.firmwareType == ::ananas::Utils::FirmwareType::wfsModule
-                        && std::abs(s.position.y) > ArrayLineToleranceMetres) {
-                        problems.push_back({Type::wfsSpeakerOffArrayLine, Severity::warning, index, s.moduleIp,
-                                            "WFS speakers must be on y = 0 for now."});
+                    if (module.info.firmwareType == ::ananas::Utils::FirmwareType::wfsModule) {
+                        if (std::abs(s.position.y) > ArrayLineToleranceMetres) {
+                            problems.push_back({Type::wfsSpeakerOffArrayLine, Severity::warning, index, s.moduleIp,
+                                                "WFS speakers must be on y = 0 for now."});
+                        }
+                        if (std::abs(s.position.x) > Constants::MaxXMetres
+                            || std::abs(s.position.y) > Constants::MaxXMetres) {
+                            problems.push_back({Type::wfsSpeakerOutOfRange, Severity::warning, index, s.moduleIp,
+                                                "WFS modules clip positions beyond "
+                                                + juce::String{Constants::MaxXMetres, 2} + " m from the centre."});
+                        }
+                        if (s.facing.horizontalLength() < MinHorizontalFacing) {
+                            problems.push_back({Type::wfsSpeakerNotHorizontal, Severity::warning, index, s.moduleIp,
+                                                "WFS speakers need to face sideways, not up or down."});
+                        }
+                        if (std::abs(s.z) > HeightToleranceMetres) {
+                            problems.push_back({Type::wfsHeightIgnored, Severity::info, index, s.moduleIp,
+                                                "WFS ignores the height."});
+                        }
                     }
                     if (s.output < 0 || s.output >= module.info.numSpeakers) {
                         problems.push_back({Type::outputOutOfRange, Severity::warning, index, s.moduleIp,
@@ -142,6 +163,10 @@ namespace ananas::WFS
             speaker.setProperty(Identifiers::SpeakerIndexPropertyID, static_cast<int>(i), nullptr);
             speaker.setProperty(Identifiers::SpeakerXPropertyID, s.position.x, nullptr);
             speaker.setProperty(Identifiers::SpeakerYPropertyID, s.position.y, nullptr);
+            speaker.setProperty(Identifiers::SpeakerZPropertyID, s.z, nullptr);
+            speaker.setProperty(Identifiers::SpeakerFacingXPropertyID, s.facing.x, nullptr);
+            speaker.setProperty(Identifiers::SpeakerFacingYPropertyID, s.facing.y, nullptr);
+            speaker.setProperty(Identifiers::SpeakerFacingZPropertyID, s.facing.z, nullptr);
             speaker.setProperty(Identifiers::SpeakerModuleIpPropertyID, s.moduleIp, nullptr);
             speaker.setProperty(Identifiers::SpeakerOutputPropertyID, s.output, nullptr);
             speaker.setProperty(Identifiers::SpeakerSeverityPropertyID, severities[i], nullptr);

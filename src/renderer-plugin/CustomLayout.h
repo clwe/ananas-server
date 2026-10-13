@@ -25,8 +25,8 @@ namespace ananas::WFS
      * the plugin's one live instance, changed only through its methods,
      * which keep it valid and notify listeners.
      *
-     * Always valid: positions are finite, and a speaker without a module has
-     * output -1. Whether the layout makes sense (outputs that exist, no two
+     * Always valid: positions and heights are finite, facing directions are
+     * unit vectors, and a speaker without a module has output -1. Whether the layout makes sense (outputs that exist, no two
      * speakers in one place, ...) is checkLayout()'s job, not this class's:
      * a layout being edited is allowed to be wrong for a while.
      *
@@ -48,6 +48,10 @@ namespace ananas::WFS
         void removeSpeaker(int index);
 
         void setPosition(int index, juce::Point<float> position);
+
+        void setHeight(int index, float z);
+
+        void setFacing(int index, Direction facing);
 
         // An empty IP disconnects the speaker from any module.
         void setModule(int index, const juce::String &moduleIp, int output);
