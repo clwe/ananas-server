@@ -292,6 +292,15 @@ Positions stay on the server; the firmware never stores or hardcodes them.
 - [ ] Authority announcement: check the received packet size, and guard
       `AuthorityInfo` with a lock (written by the listener thread, read by the UI).
 - [ ] Ananas Server plugin: save and restore its state (switches).
+- [ ] **Known, external: CLAP wrapper assertions** in debug builds
+      (`clap-juce-wrapper.cpp:991` and `:1037`). The wrapper only supports
+      mono and stereo buses, and AnanasRenderer has 8 source inputs and a
+      9-channel Ambisonics input. Harmless: the wrapper still reports the
+      right channel count, and audio works. The code is in the
+      `clap-juce-extensions` submodule (its own `@TODO` for
+      `CLAP_PORT_SURROUND` / `CLAP_PORT_AMBISONIC`), not in Ananas; check
+      whether a newer version supports these port types when the submodule
+      is next updated.
 
 ## Interoperability
 
