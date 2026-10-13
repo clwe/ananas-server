@@ -200,6 +200,18 @@ public:
             }
         }
 
+        beginTest("The WFS range depends on the module's speaker protocol");
+        {
+            auto current = makeModule("current", 2);
+            current.info.speakerProtocol = 1;
+            const auto layout = makeLayout({{{5.f, 0.f}, "current", 0}, {{-12.f, 0.f}, "current", 1}});
+            const auto problems = checkLayout(layout, {current});
+
+            // ±10 m on protocol 1: 5 m is fine, 12 m isn't.
+            expect(!has(problems, Type::wfsSpeakerOutOfRange, 0));
+            expect(has(problems, Type::wfsSpeakerOutOfRange, 1));
+        }
+
         beginTest("Tree for the UI: one child per speaker, with its worst severity and its problems");
         {
             using ananas::WFS::Identifiers;
