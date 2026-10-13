@@ -53,6 +53,7 @@ target_sources(ananasRenderer
         SecondarySourceMessenger.cpp
         VirtualSourceMessenger.cpp
         UI/WFSInterfaceComponent.cpp
+        UI/SpeakerTableComponent.cpp
         UI/XYControllerComponent.cpp
         UI/SpeakerIconComponent.cpp
         UI/ModuleComponent.cpp
