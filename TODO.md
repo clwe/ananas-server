@@ -114,12 +114,19 @@ Positions stay on the server; the firmware never stores or hardcodes them.
         position until speaker orientation (`/ss/<j>/nx|ny`) exists.
       - A dome needs z in `Speaker` and `/ss/<j>/z` (see protocol
         extensions below).
-- [ ] **Save and load the edited layout as an Ananas JSON file:** file-wide
+- [x] **Save and load the edited layout as an Ananas JSON file:** file-wide
       settings (format version, units, coordinate convention, reference
       point) plus the speaker list,
       and room for generators and new fields. Read and written with
       `juce::JSON`. Stored separately from projects, since it describes the
       room, not the piece; projects refer to it.
+      Done: `LayoutFile` (format `ananas-speaker-layout`, version 1);
+      "Save layout..." / "Load layout..." in the Speakers tab. Unknown
+      fields are ignored, a non-zero z loads as 0 with a warning, and a file
+      with errors isn't loaded at all.
+      Still open: projects contain the custom layout itself; referring to a
+      file instead (and reloading it when it changes) would be a separate
+      step, if wanted.
 - [ ] **CSV import and export of the speaker table only** (position,
       orientation, module IP, output), for editing in spreadsheets and
       importing from design tools. Fixed header row, decimal point, explicit
@@ -136,18 +143,47 @@ Positions stay on the server; the firmware never stores or hardcodes them.
       to find which physical speaker is wired where. Needs a small firmware
       command for Ambisonics modules, whose stream doesn't address single
       outputs.
-- [ ] **Protocol extensions:** `/ss/<j>/z` for elevated speakers, and
-      `/ss/<j>/nx|ny` (orientation) for WFS on non-linear layouts.
-      - **Mute outputs that no speaker uses.** Today they get the position
-        (0, 0), which modules render as a speaker at the origin; not
-        sending a position isn't safe either, since modules keep whatever
-        position they have. Needs a message such as `/ss/<j>/mute 0|1`, or
-        a gain per output (see `/levelout` under Ambisonics), handled by
-        both module types and included in the echo check, so it's resent
-        after a reboot (firmware handover). Server side:
-        `RenderLayout::compute` records the unused outputs per module, and
-        `sendSpeakerPositions` sends the mute. Only matters once layouts
-        can be edited; with the linear array every output has a speaker.
+- [ ] **Protocol extensions: height, orientation and gain per output.**
+      Proposed to the firmware side in
+      `teensy-audiosync/docs/firmware-handover-speaker-geometry.md`, with
+      open questions at its end (gain default at boot, WFS range, WFS with
+      orientation, speaker identification in the same round). In short:
+      one message per output, `/ss/<j>` with `x y z nx ny nz gain`
+      (the facing direction is a 3-D unit vector; WFS uses its horizontal
+      part, Ambisonics ignores it for now, and `nz` is reserved for tilted
+      speakers, so they don't need another protocol change); a set id
+      `/ss/id`, echoed in the announcement, so the server resends after a
+      reboot (comparing echoed positions misses outputs at (0, 0)); new
+      announcement fields `speakerProtocol` and `speakerSetId`; modules
+      without them keep getting `/ss/<j>/x|y` (legacy stereo modules
+      unchanged).
+      - **Why mute:** outputs no speaker uses get the position (0, 0) and
+        play as a speaker at the origin; not sending a position isn't safe
+        either, since modules keep whatever position they have. Only
+        matters with custom layouts; in the linear array every output has a
+        speaker.
+      - **WFS range:** the WFS firmware clamps speaker x and y to ±2.25 m
+        (`MAX_X`), so custom layouts with WFS speakers further out are
+        silently clipped today. The handover asks for a larger range.
+      - **Server side, once the firmware has it:**
+        - `Packet.h`: the two announcement fields; `ModuleInfo` stores them.
+        - `RenderLayout::compute` records, per module output, whether a
+          speaker uses it, its z and orientation.
+        - `sendSpeakerPositions`: for modules on protocol 1, one bundle with
+          `/ss/id` and `/ss/<j>` for every output (gain 0 for unused ones),
+          resent when the echoed id differs; protocol 0 unchanged.
+      - **Server side, can be done now (independent of the firmware):**
+        - Give `Speaker` z and an orientation as a 3-D unit vector
+          (default `(0, -1, 0)`, facing the listener), in `CustomLayout`, the
+          speaker table (columns), the JSON format (then z loads instead of
+          being dropped) and `generateLinearArray`. The table can start with
+          a horizontal angle and add tilt later; the data is 3-D from the
+          start.
+        - `checkLayout`: warn about WFS speakers beyond ±2.25 m (clipped by
+          the current firmware), about WFS speakers pointing (almost)
+          straight up or down (no horizontal direction), and later about
+          speakers facing away from the listening area.
+        - The Ambisonics renderer's rmax from 3-D distances once z exists.
 
 ## Ambisonics
 
