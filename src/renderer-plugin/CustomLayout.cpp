@@ -15,6 +15,16 @@ namespace ananas::WFS
         }
     }
 
+    juce::String toString(const LayoutMode mode)
+    {
+        return mode == LayoutMode::custom ? "custom" : "linearArray";
+    }
+
+    LayoutMode layoutModeFromString(const juce::String &s)
+    {
+        return s == "custom" ? LayoutMode::custom : LayoutMode::linearArray;
+    }
+
     const SpeakerLayout &CustomLayout::getLayout() const
     {
         return layout;

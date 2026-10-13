@@ -37,6 +37,12 @@ PluginProcessor::PluginProcessor()
 
     linearArraySetup.addChangeListener(this);
 
+    layoutTree = persistentTree.getOrCreateChildWithName(ananas::WFS::Identifiers::LayoutTreeType, nullptr);
+    layoutTree.setProperty(ananas::WFS::Identifiers::LayoutModePropertyID, ananas::WFS::toString(layoutMode), nullptr);
+    customLayoutTree = persistentTree.getOrCreateChildWithName(ananas::WFS::Identifiers::CustomLayoutTreeType, nullptr);
+    updateCustomLayoutTree();
+    customLayout.addChangeListener(this);
+
     for (uint n{0}; n < ananas::WFS::Constants::NumSources; ++n) {
         // Set up source amplitudes for visualisation.
         virtualSourceAmplitudes.set(static_cast<int>(n), new std::atomic{0.f});
@@ -59,6 +65,7 @@ PluginProcessor::~PluginProcessor()
     server->getAuthority()->removeChangeListener(this);
     server->getSwitches()->removeChangeListener(this);
     linearArraySetup.removeChangeListener(this);
+    customLayout.removeChangeListener(this);
     stopTimer();
 }
 
@@ -193,10 +200,17 @@ void PluginProcessor::getStateInformation(juce::MemoryBlock &destData)
     removeChildrenWithType(state, ananas::Utils::Identifiers::SwitchesParamID);
     removeChildrenWithType(state, ananas::Utils::Identifiers::ModulesParamID);
     removeChildrenWithType(state, ananas::WFS::Identifiers::LinearArrayTreeType);
+    removeChildrenWithType(state, ananas::WFS::Identifiers::CustomLayoutTreeType);
+    removeChildrenWithType(state, ananas::WFS::Identifiers::LayoutTreeType);
 
     state.addChild(getServer().getSwitches()->toValueTree(), -1, nullptr);
     state.addChild(getServer().getModuleList()->toValueTree(), -1, nullptr);
     state.addChild(linearArraySetup.toValueTree(), -1, nullptr);
+    state.addChild(customLayout.toValueTree(), -1, nullptr);
+
+    juce::ValueTree layout(ananas::WFS::Identifiers::LayoutTreeType);
+    layout.setProperty(ananas::WFS::Identifiers::LayoutModePropertyID, ananas::WFS::toString(layoutMode), nullptr);
+    state.addChild(layout, -1, nullptr);
 
     const auto xml(state.createXml());
     copyXmlToBinary(*xml, destData);
@@ -229,7 +243,18 @@ void PluginProcessor::setStateInformation(const void *data, int size)
 
             removeChildrenWithType(tree, ananas::Utils::Identifiers::SwitchesParamID);
             removeChildrenWithType(tree, ananas::Utils::Identifiers::ModulesParamID);
+            const auto savedCustomLayout{getLastChildWithType(tree, ananas::WFS::Identifiers::CustomLayoutTreeType)};
+            if (savedCustomLayout.isValid()) {
+                customLayout.fromValueTree(savedCustomLayout);
+            }
+
+            // Projects without a layout mode use the linear array.
+            const auto savedLayout{getLastChildWithType(tree, ananas::WFS::Identifiers::LayoutTreeType)};
+            setLayoutMode(ananas::WFS::layoutModeFromString(savedLayout[ananas::WFS::Identifiers::LayoutModePropertyID].toString()));
+
             removeChildrenWithType(tree, ananas::WFS::Identifiers::LinearArrayTreeType);
+            removeChildrenWithType(tree, ananas::WFS::Identifiers::CustomLayoutTreeType);
+            removeChildrenWithType(tree, ananas::WFS::Identifiers::LayoutTreeType);
 
             apvts.replaceState(tree);
         }
@@ -274,7 +299,45 @@ void PluginProcessor::changeListenerCallback(juce::ChangeBroadcaster *source)
     } else if (source == &linearArraySetup) {
         updateLinearArrayTree();
         updateRenderLayout();
+    } else if (source == &customLayout) {
+        updateCustomLayoutTree();
+        updateRenderLayout();
     }
+}
+
+void PluginProcessor::updateCustomLayoutTree()
+{
+    ananas::Utils::syncChildren(customLayoutTree, customLayout.toValueTree(), ananas::WFS::Identifiers::SpeakerIndexPropertyID);
+}
+
+ananas::WFS::CustomLayout &PluginProcessor::getCustomLayout()
+{
+    return customLayout;
+}
+
+ananas::WFS::LayoutMode PluginProcessor::getLayoutMode() const
+{
+    return layoutMode;
+}
+
+void PluginProcessor::setLayoutMode(const ananas::WFS::LayoutMode mode)
+{
+    if (mode == layoutMode) return;
+
+    layoutMode = mode;
+    layoutTree.setProperty(ananas::WFS::Identifiers::LayoutModePropertyID, ananas::WFS::toString(layoutMode), nullptr);
+    updateRenderLayout();
+}
+
+void PluginProcessor::convertToCustomLayout()
+{
+    customLayout.setSpeakers(generateLinearArray().layout.getSpeakers());
+    setLayoutMode(ananas::WFS::LayoutMode::custom);
+}
+
+ananas::WFS::LinearArray PluginProcessor::generateLinearArray() const
+{
+    return ananas::WFS::generateLinearArray(linearArraySetup.getSettings(), server->getModuleList()->getEntries());
 }
 
 void PluginProcessor::updateLinearArrayTree()
@@ -303,27 +366,32 @@ void PluginProcessor::assignModuleToSlot(const int slot, const juce::String &mod
 void PluginProcessor::updateRenderLayout()
 {
     const auto modules{server->getModuleList()->getEntries()};
+    const auto isCustom = layoutMode == ananas::WFS::LayoutMode::custom;
 
-    const auto &linArrSettings = linearArraySetup.getSettings();
-    
-    ananas::WFS::LinearArray linArr = ananas::WFS::generateLinearArray(linArrSettings, modules);
+    const auto linArr = generateLinearArray();
+    const ananas::WFS::SpeakerLayout &speakers = isCustom ? customLayout.getLayout() : linArr.layout;
 
-    renderLayout = ananas::WFS::RenderLayout::compute(linArr.layout, modules);
+    renderLayout = ananas::WFS::RenderLayout::compute(speakers, modules);
 
     // The speakers and their problems, for the speaker table.
-    const auto speakerLayout = ananas::WFS::toValueTree(linArr.layout, ananas::WFS::checkLayout(linArr.layout, modules));
-    ananas::Utils::syncChildren(speakerLayoutTree, speakerLayout, ananas::WFS::Identifiers::SpeakerIndexPropertyID);
+    const auto speakerLayoutMirror = ananas::WFS::toValueTree(speakers, ananas::WFS::checkLayout(speakers, modules));
+    ananas::Utils::syncChildren(speakerLayoutTree, speakerLayoutMirror, ananas::WFS::Identifiers::SpeakerIndexPropertyID);
     speakerLayoutTree.setProperty(ananas::WFS::Identifiers::SpeakerLayoutModuleProblemsPropertyID,
-                                  speakerLayout[ananas::WFS::Identifiers::SpeakerLayoutModuleProblemsPropertyID],
+                                  speakerLayoutMirror[ananas::WFS::Identifiers::SpeakerLayoutModuleProblemsPropertyID],
                                   nullptr);
 
+    // Slots only exist in a linear array: a custom layout gets no slot
+    // selectors, and the XY view spans its outermost speakers.
     auto layoutVar = renderLayout.toVar();
     juce::Array<juce::var> slots;
-    for (const auto n: linArr.slotNumSpeakers)
-        slots.add(n);
+    if (!isCustom) {
+        for (const auto n: linArr.slotNumSpeakers)
+            slots.add(n);
+    }
 
     layoutVar.getDynamicObject()->setProperty(ananas::WFS::Identifiers::ArraySlotNumSpeakersPropertyID, slots);
-    layoutVar.getDynamicObject()->setProperty(ananas::WFS::Identifiers::ArrayWidthPropertyID, linArr.arrayWidth);
+    layoutVar.getDynamicObject()->setProperty(ananas::WFS::Identifiers::ArrayWidthPropertyID,
+                                              isCustom ? 2.f * renderLayout.outerSpeakerX : linArr.arrayWidth);
 
     dynamicTree.setProperty(ananas::WFS::Identifiers::ArrayLayoutParamID, layoutVar, nullptr);
 

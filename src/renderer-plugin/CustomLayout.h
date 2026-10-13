@@ -7,6 +7,19 @@
 
 namespace ananas::WFS
 {
+    // Where the speakers the renderers use come from.
+    enum class LayoutMode
+    {
+        // Generated from the LinearArraySetup.
+        linearArray,
+        // The CustomLayout's speakers.
+        custom,
+    };
+
+    // For saving; layoutModeFromString returns linearArray for anything unknown.
+    juce::String toString(LayoutMode mode);
+    LayoutMode layoutModeFromString(const juce::String &s);
+
     /**
      * A layout of explicitly placed speakers, edited one speaker at a time:
      * the plugin's one live instance, changed only through its methods,

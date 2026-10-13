@@ -220,6 +220,9 @@ namespace ananas::WFS
         // Speaker children use the index, position, module and output
         // properties below.
         inline static const juce::Identifier CustomLayoutTreeType{"CustomLayout"};
+        // Which layout the renderers use: the linear array or the custom one.
+        inline static const juce::Identifier LayoutTreeType{"Layout"};
+        inline static const juce::Identifier LayoutModePropertyID{"mode"};
         inline static const juce::Identifier SpeakerLayoutModuleProblemsPropertyID{"moduleProblems"};
         inline static const juce::Identifier SpeakerTreeType{"Speaker"};
         inline static const juce::Identifier SpeakerIndexPropertyID{"index"};

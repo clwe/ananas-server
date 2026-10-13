@@ -182,6 +182,15 @@ public:
             layout.setModule(0, "a", 1);
             expectEquals(counter.deliver(), 2);
         }
+
+        beginTest("Layout mode as saved text; unknown text means the linear array");
+        {
+            using ananas::WFS::LayoutMode;
+            expect(ananas::WFS::layoutModeFromString(ananas::WFS::toString(LayoutMode::custom)) == LayoutMode::custom);
+            expect(ananas::WFS::layoutModeFromString(ananas::WFS::toString(LayoutMode::linearArray)) == LayoutMode::linearArray);
+            expect(ananas::WFS::layoutModeFromString({}) == LayoutMode::linearArray);
+            expect(ananas::WFS::layoutModeFromString("ring") == LayoutMode::linearArray);
+        }
     }
 };
 

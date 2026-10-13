@@ -11,6 +11,7 @@
 #include "SecondarySourceMessenger.h"
 #include "Renderers/Renderer.h"
 #include "LinearArray.h"
+#include "CustomLayout.h"
 
 class PluginProcessor final : public juce::AudioProcessor,
                               public juce::ChangeListener,
@@ -83,6 +84,19 @@ public:
     // get the linear array for the UI
     [[nodiscard]] ananas::WFS::LinearArraySetup& getLinearArraySetup();
 
+    // The custom layout, for the UI to edit.
+    [[nodiscard]] ananas::WFS::CustomLayout &getCustomLayout();
+
+    [[nodiscard]] ananas::WFS::LayoutMode getLayoutMode() const;
+
+    // Which layout the renderers use. The other one is kept, so switching
+    // back and forth loses nothing.
+    void setLayoutMode(ananas::WFS::LayoutMode mode);
+
+    // Copies the speakers of the current linear array into the custom
+    // layout, replacing what it had, and switches to it.
+    void convertToCustomLayout();
+
 private:
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(PluginProcessor)
 
@@ -112,6 +126,11 @@ private:
 
     void updateLinearArrayTree();
 
+    void updateCustomLayoutTree();
+
+    // The linear array from the current setup and module list.
+    [[nodiscard]] ananas::WFS::LinearArray generateLinearArray() const;
+
     static bool isEchoedByModule(const ananas::ModuleInfo &info, const std::vector<juce::Point<float>> &positions);
 
     std::unique_ptr<ananas::Server::Server> server;
@@ -131,6 +150,9 @@ private:
     // The speakers in use and their problems, mirrored into dynamicTree for
     // the UI.
     juce::ValueTree speakerLayoutTree;
+    // The layout mode and the custom layout, mirrored for the UI.
+    juce::ValueTree layoutTree;
+    juce::ValueTree customLayoutTree;
 
     ananas::WFS::SecondarySourceMessenger secondarySourceMessenger;
 
@@ -143,6 +165,8 @@ private:
     ananas::WFS::RenderLayout renderLayout;
 
     ananas::WFS::LinearArraySetup linearArraySetup;
+    ananas::WFS::CustomLayout customLayout;
+    ananas::WFS::LayoutMode layoutMode = ananas::WFS::LayoutMode::linearArray;
 
     struct SentPositions
     {
