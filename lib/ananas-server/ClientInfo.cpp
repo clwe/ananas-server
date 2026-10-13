@@ -44,6 +44,8 @@ namespace ananas
         numSpeakers = getNumSpeakers(packet);
         reportedSecondarySource0 = {packet.secondarySource0x, packet.secondarySource0y};
         reportedSecondarySource1 = {packet.secondarySource1x, packet.secondarySource1y};
+        speakerProtocol = packet.speakerProtocol;
+        speakerSetId = packet.speakerSetId;
     }
 
     juce::ValueTree ModuleInfo::toValueTree() const
@@ -145,8 +147,11 @@ namespace ananas
                 secondarySource1x,
                 secondarySource1y,
                 numSources,
-                numSpeakers
+                numSpeakers,
+                speakerProtocol,
+                speakerSetId
             ]{packet};
+            juce::ignoreUnused(speakerProtocol, speakerSetId);
             client->setProperty(Utils::Identifiers::ClientSerialNumberPropertyID, static_cast<int>(serial));
             client->setProperty(Utils::Identifiers::ClientFirmwareTypeVersionPropertyID,
                                 Utils::FirmwareTypeToString(firmwareType) + " v" + Utils::VersionNumberToString(firmwareVersion));

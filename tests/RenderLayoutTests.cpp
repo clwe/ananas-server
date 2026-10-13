@@ -69,9 +69,9 @@ public:
             expect(approximatelyEqual(c.array.arrayWidth, 3.2f));
             // Previously: (numModules - .5) * spacing.
             expect(approximatelyEqual(c.layout.outerSpeakerX, 1.5f));
-            expect(approximatelyEqual(c.layout.modulePositions.at("a")[0].x, -1.5f));
-            expect(approximatelyEqual(c.layout.modulePositions.at("a")[1].x, -1.3f));
-            expect(approximatelyEqual(c.layout.modulePositions.at("b")[0].x, -.3f));
+            expect(approximatelyEqual(c.layout.moduleOutputs.at("a")[0].position.x, -1.5f));
+            expect(approximatelyEqual(c.layout.moduleOutputs.at("a")[1].position.x, -1.3f));
+            expect(approximatelyEqual(c.layout.moduleOutputs.at("b")[0].position.x, -.3f));
         }
 
         beginTest("Slots are as wide as their module");
@@ -80,17 +80,18 @@ public:
             expect(c.array.slotNumSpeakers == std::vector<int>{2, 16, 2});
             expectEquals(c.totalNumSpeakers(), 20);
             expect(approximatelyEqual(c.layout.outerSpeakerX, .95f));
-            const auto &positions{c.layout.modulePositions.at("adau")};
-            expectEquals(static_cast<int>(positions.size()), 16);
-            expect(approximatelyEqual(positions[0].x, -.95f + 2 * .1f));
-            expect(approximatelyEqual(positions[15].x, -.95f + 17 * .1f));
+            const auto &outputs{c.layout.moduleOutputs.at("adau")};
+            expectEquals(static_cast<int>(outputs.size()), 16);
+            expect(approximatelyEqual(outputs[0].position.x, -.95f + 2 * .1f));
+            expect(approximatelyEqual(outputs[15].position.x, -.95f + 17 * .1f));
         }
 
         beginTest("Unassigned modules, and slots beyond the number of modules, are at the origin");
         {
             const auto c{compute({makeModule("free", -1, 16), makeModule("far", 5, 2)}, 3, .1f)};
-            expect(c.layout.modulePositions.at("free")[15] == juce::Point<float>{});
-            expect(c.layout.modulePositions.at("far")[0] == juce::Point<float>{});
+            // At the origin, and not used (muted on modules that support it).
+            expect(c.layout.moduleOutputs.at("free")[15] == ananas::WFS::OutputGeometry{});
+            expect(c.layout.moduleOutputs.at("far")[0] == ananas::WFS::OutputGeometry{});
         }
 
         beginTest("Only WFS modules limit the number of rendered sources");
@@ -107,7 +108,7 @@ public:
             expectEquals(mixed.layout.numRenderedSources, static_cast<int>(ananas::WFS::Constants::NumSources));
             expectEquals(mixed.layout.numLimitingModules, 0);
             expectEquals(mixed.totalNumSpeakers(), 21);
-            expect(approximatelyEqual(mixed.layout.modulePositions.at("ambi")[0].x, -1.f + 16 * .1f));
+            expect(approximatelyEqual(mixed.layout.moduleOutputs.at("ambi")[0].position.x, -1.f + 16 * .1f));
         }
 
         // Custom layouts: speakers placed directly, not generated.
@@ -142,16 +143,48 @@ public:
             expect(approximatelyEqual(layout.outerSpeakerX, 3.f));
         }
 
-        beginTest("Heights per output, in the same order as the positions");
+        beginTest("Per output: position, height, facing, and whether a speaker uses it");
         {
-            const auto layout = computeCustom({{{-1.f, -2.f}, "ambi", 1, 2.f}, {{1.f, -2.f}, "ambi", 0, .5f}},
+            const auto facing = ananas::WFS::Direction::fromAngles(30.f, 10.f);
+            const auto layout = computeCustom({{{-1.f, -2.f}, "ambi", 1, 2.f, facing}, {{1.f, -2.f}, "ambi", 0, .5f}},
                                               {makeModule("ambi", 0, 3, 9, ambisonics).entry});
-            const auto heights = layout.moduleHeights.at("ambi");
-            expectEquals(static_cast<int>(heights.size()), 3);
-            expect(approximatelyEqual(heights[0], .5f));
-            expect(approximatelyEqual(heights[1], 2.f));
-            expect(approximatelyEqual(heights[2], 0.f));
-            expect(layout.getSpeakerHeights(ambisonics) == heights);
+            const auto &outputs = layout.moduleOutputs.at("ambi");
+            expectEquals(static_cast<int>(outputs.size()), 3);
+            expect(outputs[0] == ananas::WFS::OutputGeometry{{1.f, -2.f}, .5f, {}, true});
+            expect(outputs[1] == ananas::WFS::OutputGeometry{{-1.f, -2.f}, 2.f, facing, true});
+            expect(outputs[2] == ananas::WFS::OutputGeometry{});
+
+            // The used outputs only, in output order.
+            const auto speakers = layout.getSpeakers(ambisonics);
+            expectEquals(static_cast<int>(speakers.size()), 2);
+            expect(speakers[0] == outputs[0]);
+            expect(speakers[1] == outputs[1]);
+            expect(ananas::WFS::RenderLayout::getPositions(outputs)
+                   == std::vector<juce::Point<float>>{{1.f, -2.f}, {-1.f, -2.f}, {}});
+        }
+
+        beginTest("Position limits by speaker protocol");
+        {
+            auto legacy = makeModule("legacy", 0, 2).entry;
+            auto current = makeModule("current", 0, 2).entry;
+            current.info.speakerProtocol = 1;
+            using ananas::WFS::Constants;
+
+            expect(approximatelyEqual(ananas::WFS::getMaxPositionMetres(legacy.info), Constants::LegacyMaxPositionMetres));
+            expect(approximatelyEqual(ananas::WFS::getMaxPositionMetres(current.info), Constants::MaxPositionMetres));
+
+            // The smallest limit of the assigned WFS modules.
+            const auto both = computeCustom({{{-1.f, 0.f}, "legacy", 0}, {{1.f, 0.f}, "current", 0}}, {legacy, current});
+            expect(approximatelyEqual(both.maxWfsPositionMetres, Constants::LegacyMaxPositionMetres));
+            const auto currentOnly = computeCustom({{{1.f, 0.f}, "current", 0}}, {legacy, current});
+            expect(approximatelyEqual(currentOnly.maxWfsPositionMetres, Constants::MaxPositionMetres));
+        }
+
+        beginTest("Speaker set ids are never 0");
+        {
+            expectEquals(static_cast<int>(ananas::WFS::nextSpeakerSetId(0)), 1);
+            expectEquals(static_cast<int>(ananas::WFS::nextSpeakerSetId(41)), 42);
+            expectEquals(static_cast<int>(ananas::WFS::nextSpeakerSetId(std::numeric_limits<juce::uint32>::max())), 1);
         }
     }
 };

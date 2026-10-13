@@ -45,6 +45,11 @@ namespace ananas
         // Positions of ss/0 and ss/1 as echoed in the module's announcements.
         std::pair<float, float> reportedSecondarySource0{0.f, 0.f};
         std::pair<float, float> reportedSecondarySource1{0.f, 0.f};
+        // Speaker messages the module understands (see ClientAnnouncePacket),
+        // and the last speaker set id it echoed. Not saved: they come from the
+        // module, and change with its firmware.
+        int speakerProtocol{0};
+        juce::uint32 speakerSetId{0};
 
     private:
         juce::uint32 lastReceiveTime{0};

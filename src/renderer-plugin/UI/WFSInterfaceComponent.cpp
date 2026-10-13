@@ -274,10 +274,13 @@ namespace ananas::WFS::UI
                          (numLimitingModules == 1 ? " module." : " modules."));
         }
 
-        if (outerSpeakerX > Constants::MaxXMetres) {
+        // The smallest limit of the WFS modules in use: ±2.25 m if any runs
+        // firmware from before speaker protocol 1.
+        const float maxPosition{layout->getProperty(Identifiers::ArrayMaxWfsPositionPropertyID)};
+        if (maxPosition > 0.f && outerSpeakerX > maxPosition) {
             warnings.add("Outer speakers at " + juce::String::fromUTF8("\u00b1") + juce::String{outerSpeakerX, 2} +
                          " m exceed the modules' range of " + juce::String::fromUTF8("\u00b1") +
-                         juce::String{Constants::MaxXMetres, 2} + " m.");
+                         juce::String{maxPosition, 2} + " m.");
         }
 
         arrayWarningLabel.setText(warnings.joinIntoString(" "), juce::dontSendNotification);

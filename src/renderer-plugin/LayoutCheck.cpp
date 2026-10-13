@@ -1,5 +1,6 @@
 #include "LayoutCheck.h"
 #include "WFSUtils.h"
+#include "RenderLayout.h"
 
 namespace ananas::WFS
 {
@@ -66,11 +67,11 @@ namespace ananas::WFS
                             problems.push_back({Type::wfsSpeakerOffArrayLine, Severity::warning, index, s.moduleIp,
                                                 "WFS speakers must be on y = 0 for now."});
                         }
-                        if (std::abs(s.position.x) > Constants::MaxXMetres
-                            || std::abs(s.position.y) > Constants::MaxXMetres) {
+                        const auto maxPosition = getMaxPositionMetres(module.info);
+                        if (std::abs(s.position.x) > maxPosition || std::abs(s.position.y) > maxPosition) {
                             problems.push_back({Type::wfsSpeakerOutOfRange, Severity::warning, index, s.moduleIp,
-                                                "WFS modules clip positions beyond "
-                                                + juce::String{Constants::MaxXMetres, 2} + " m from the centre."});
+                                                "Module " + s.moduleIp + " clips positions beyond "
+                                                + juce::String{maxPosition, 2} + " m from the centre."});
                         }
                         if (s.facing.horizontalLength() < MinHorizontalFacing) {
                             problems.push_back({Type::wfsSpeakerNotHorizontal, Severity::warning, index, s.moduleIp,

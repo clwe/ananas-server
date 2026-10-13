@@ -431,31 +431,52 @@ void PluginProcessor::sendSpeakerPositions(const bool resendUnconfirmed)
     for (const auto &[ip, info, isConnected]: server->getModuleList()->getEntries()) {
         if (!isConnected) {
             // Send again when it reconnects, e.g. after a reboot.
-            sentSpeakerPositions.erase(ip);
+            sentSpeakerGeometry.erase(ip);
             continue;
         }
 
-        const auto desired{renderLayout.modulePositions.find(ip)};
-        if (desired == renderLayout.modulePositions.end()) continue;
+        const auto desired{renderLayout.moduleOutputs.find(ip)};
+        if (desired == renderLayout.moduleOutputs.end()) continue;
 
-        const auto sent{sentSpeakerPositions.find(ip)};
-        auto shouldSend{sent == sentSpeakerPositions.end() || sent->second.positions != desired->second};
+        const auto &outputs{desired->second};
+        const auto protocol{info.speakerProtocol >= 1 ? 1 : 0};
 
-        // Modules don't store positions, and only echo the first two in their
-        // announcements; if those don't match, the module has probably
-        // rebooted (or missed the message), so send them again.
+        const auto sent{sentSpeakerGeometry.find(ip)};
+        auto shouldSend{sent == sentSpeakerGeometry.end()
+                        || sent->second.outputs != outputs
+                        || sent->second.protocol != protocol};
+
+        // Modules don't store positions. If one doesn't confirm what was
+        // sent, it has probably rebooted (or missed the message), so send
+        // again. On protocol 1 it echoes the set id; on the legacy protocol
+        // only the first two positions, which can't tell a reboot from
+        // speakers that really are at the origin.
         if (!shouldSend && resendUnconfirmed &&
             now - sent->second.timeMs >= ananas::WFS::Constants::SpeakerPositionResendIntervalMs) {
-            shouldSend = !isEchoedByModule(info, desired->second);
+            shouldSend = protocol == 1
+                             ? info.speakerSetId != sent->second.setId
+                             : !isEchoedByModule(info, ananas::WFS::RenderLayout::getPositions(outputs));
         }
 
         if (shouldSend) {
             // Record failed attempts too, so they're retried at the resend
             // interval rather than on every call.
-            secondarySourceMessenger.sendPositions(ip, desired->second);
-            sentSpeakerPositions[ip] = {desired->second, now};
+            juce::uint32 setId{0};
+            if (protocol == 1) {
+                setId = takeSpeakerSetId();
+                secondarySourceMessenger.sendGeometry(ip, setId, outputs);
+            } else {
+                secondarySourceMessenger.sendPositions(ip, ananas::WFS::RenderLayout::getPositions(outputs));
+            }
+            sentSpeakerGeometry[ip] = {outputs, protocol, setId, now};
         }
     }
+}
+
+juce::uint32 PluginProcessor::takeSpeakerSetId()
+{
+    lastSpeakerSetId = ananas::WFS::nextSpeakerSetId(lastSpeakerSetId);
+    return lastSpeakerSetId;
 }
 
 bool PluginProcessor::isEchoedByModule(const ananas::ModuleInfo &info, const std::vector<juce::Point<float>> &positions)

@@ -177,13 +177,21 @@ private:
     // The speakers in use, as of the last updateRenderLayout().
     ananas::WFS::SpeakerLayout speakerLayout;
 
-    struct SentPositions
+    // The next speaker set id for /ss/id: never 0, which means "nothing
+    // received" to a module.
+    juce::uint32 takeSpeakerSetId();
+
+    struct SentGeometry
     {
-        std::vector<juce::Point<float>> positions;
+        std::vector<ananas::WFS::OutputGeometry> outputs;
+        // The speaker protocol it was sent with, and the set id on protocol 1.
+        int protocol{0};
+        juce::uint32 setId{0};
         juce::uint32 timeMs{0};
     };
 
-    std::map<juce::String, SentPositions> sentSpeakerPositions;
+    std::map<juce::String, SentGeometry> sentSpeakerGeometry;
+    juce::uint32 lastSpeakerSetId{0};
 };
 
 

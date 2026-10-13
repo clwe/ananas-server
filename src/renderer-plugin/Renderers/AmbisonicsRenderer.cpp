@@ -89,8 +89,12 @@ namespace ananas::Ambisonics
     void AmbisonicsRenderer::layoutChanged(const WFS::RenderLayout &layout)
     {
         outerSpeakerX = layout.outerSpeakerX;
-        speakerPositions = layout.getSpeakerPositions(::ananas::Utils::FirmwareType::ambisonicsModule);
-        speakerHeights = layout.getSpeakerHeights(::ananas::Utils::FirmwareType::ambisonicsModule);
+        speakerPositions.clear();
+        speakerHeights.clear();
+        for (const auto &s: layout.getSpeakers(::ananas::Utils::FirmwareType::ambisonicsModule)) {
+            speakerPositions.push_back(s.position);
+            speakerHeights.push_back(s.z);
+        }
     }
 
     void AmbisonicsRenderer::modulesChanged()

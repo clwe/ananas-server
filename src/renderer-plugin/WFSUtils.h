@@ -34,12 +34,17 @@ namespace ananas::WFS
         constexpr static float MinSpeakerSpacingMetres{.05f};
         constexpr static float MaxSpeakerSpacingMetres{.3f};
         constexpr static float DefaultSpeakerSpacingMetres{.2f};
-        // TODO: receive min/max y-coordinates from clients?
+        // Source y range: from 10 m in front of the array (focused sources)
+        // to 10 m behind it, so a source can be anywhere in a room up to 10 m
+        // deep. Modules on the legacy speaker protocol clamp sources to
+        // -3 ... 10 m themselves.
         constexpr static int MaxYMetres{10};
-        constexpr static int MinYMetres{-3};
-        // Range of x-coordinates the module firmware accepts (MAX_X in the
-        // client's faust/wfsParams.lib).
-        constexpr static float MaxXMetres{2.25f};
+        constexpr static int MinYMetres{-10};
+        // Largest |x| or |y| of a speaker (and |x| of a source) that WFS
+        // modules accept: ±10 m on speaker protocol 1, ±2.25 m before that
+        // (MAX_X in the firmware's faust/wfsParams.lib).
+        constexpr static float MaxPositionMetres{10.f};
+        constexpr static float LegacyMaxPositionMetres{2.25f};
 
         // Speaker positions are resent if a module's announcement doesn't
         // echo what was sent (e.g. after a reboot), at most this often.
@@ -95,7 +100,8 @@ namespace ananas::WFS
 
         // The Ambisonics listening point, normalised like the source positions
         // (see positionXToMetres() and positionYToMetres()). Kept in front of
-        // the array, and at least 0.1 m off the speaker line.
+        // the array, and at least 0.1 m off the speaker line; 2 m in front of
+        // it by default.
         inline static const RangedParamFloat ListenerX{
             "listenerX",
             "Listener x",
@@ -107,9 +113,9 @@ namespace ananas::WFS
         inline static const RangedParamFloat ListenerY{
             "listenerY",
             "Listener y",
-            {-1.f, -.034f, 1e-6f},
-            {-1., -.034, 1e-6},
-            -2.f / 3.f
+            {-1.f, -.01f, 1e-6f},
+            {-1., -.01, 1e-6},
+            -.2f
         };
 
         struct ChoiceParam : Param
@@ -205,6 +211,7 @@ namespace ananas::WFS
         inline static const juce::Identifier ArrayOuterSpeakerXPropertyID{"outerSpeakerX"};
         inline static const juce::Identifier ArrayNumRenderedSourcesPropertyID{"numRenderedSources"};
         inline static const juce::Identifier ArrayNumLimitingModulesPropertyID{"numLimitingModules"};
+        inline static const juce::Identifier ArrayMaxWfsPositionPropertyID{"maxWfsPosition"};
 
         inline static const juce::Identifier LinearArrayTreeType{"LinearArray"};
         inline static const juce::Identifier LinearArrayNumSlotsPropertyID{"numSlots"};

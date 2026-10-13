@@ -84,10 +84,17 @@ namespace ananas
         // without these. 0 = not reported. See Utils::Constants::Legacy*.
         juce::uint8 numSources{0};
         juce::uint8 numSpeakers{0};
+        // Appended later still (teensy-audiosync
+        // docs/firmware-handover-speaker-geometry.md). Speaker messages the
+        // module understands: 0, /ss/<j>/x|y only; 1, /ss/<j> (7 floats)
+        // and /ss/id.
+        juce::uint8 speakerProtocol{0};
+        // The last /ss/id the module received; 0 after a reboot.
+        juce::uint32 speakerSetId{0};
     };
 #pragma pack(pop)
 
-    static_assert(sizeof(ClientAnnouncePacket) == 52, "ClientAnnouncePacket must match the client firmware's wire format");
+    static_assert(sizeof(ClientAnnouncePacket) == 57, "ClientAnnouncePacket must match the client firmware's wire format");
 
     // Size of the announcement sent by firmware that predates numSources/numSpeakers.
     constexpr size_t LegacyClientAnnouncePacketSize{offsetof(ClientAnnouncePacket, numSources)};

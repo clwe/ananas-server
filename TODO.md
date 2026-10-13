@@ -173,35 +173,34 @@ Positions stay on the server; the firmware never stores or hardcodes them.
         can be anywhere in a room up to 20 m wide and 10 m deep, in front
         of the array (focused) and behind it. Legacy modules keep their old
         ranges; sources are multicast, so they just keep clamping.
-      - **Server side, once the firmware has it:**
-        - `Packet.h`: the two announcement fields; `ModuleInfo` stores them.
-        - **First, merge the per-output data in `RenderLayout`.** Today
-          `modulePositions` (2-D points) and `moduleHeights` are two
-          parallel maps that have to be kept in sync by hand, and
-          `getSpeakerPositions` / `getSpeakerHeights` only match because
-          they iterate in the same order. Replace both with one entry per
-          module output, e.g.
-          `std::map<juce::String, std::vector<OutputGeometry>> moduleOutputs`
-          with `OutputGeometry { position; z; facing; isUsed; }`: exactly
-          what `/ss/<j>` sends (x, y, z, facing, gain = isUsed). Touches
-          `compute`, `sendSpeakerPositions` (its "last sent" comparison then
-          covers z, facing and mute too), `isEchoedByModule`,
-          `getSpeakerPositions` and the Ambisonics renderer, and their
-          tests; doing it here means those places change once.
-        - `RenderLayout::compute` records, per module output, whether a
-          speaker uses it, its z and orientation (in `OutputGeometry`).
-        - Set ids: a `uint32` counter from 1 that skips 0, sent as `int32`.
-        - Ranges per protocol: `Constants::MaxXMetres` (2.25) becomes the
-          legacy limit, with ±10 m for protocol-1 modules, in `checkLayout`
-          and the array warning in the WFS tab.
-        - Source ranges: `Constants::MinYMetres` / `MaxYMetres` (−3 / 10)
-          become −10 / +10, and source x may reach ±10 m. This also moves
-          the array line to the middle of the XY view, and changes what a
-          y parameter value means (fine: saved projects needn't stay
-          compatible).
-        - `sendSpeakerPositions`: for modules on protocol 1, one bundle with
-          `/ss/id` and `/ss/<j>` for every output (gain 0 for unused ones),
-          resent when the echoed id differs; protocol 0 unchanged.
+      - **Server side: done** (works with today's modules, which stay on
+        the legacy protocol; switches per module once it announces
+        protocol 1):
+        - `ClientAnnouncePacket` has `speakerProtocol` and `speakerSetId`
+          (57 bytes); `ModuleInfo` keeps them (not saved).
+        - `RenderLayout::moduleOutputs` holds one `OutputGeometry` per
+          module output (position, z, facing, whether a speaker uses it),
+          replacing the parallel position and height maps;
+          `getSpeakers(type)` returns the used ones.
+        - `sendSpeakerPositions`: protocol 1 gets `/ss/id` plus `/ss/<j>`
+          (7 floats, gain 0 for unused outputs) via
+          `SecondarySourceMessenger::sendGeometry`, resent when the echoed
+          set id differs; ids from `nextSpeakerSetId` (never 0), sent as
+          `int32`. Protocol 0 unchanged (`/ss/<j>/x|y`, echo of ss/0 and
+          ss/1).
+        - Limits per protocol: `getMaxPositionMetres` (±10 m on protocol 1,
+          ±2.25 m before) in `checkLayout`, and the smallest limit of the
+          WFS modules in use (`maxWfsPositionMetres`) for the array warning
+          in the WFS tab.
+        - Source y range −10 … +10 m (`Constants::MinYMetres` /
+          `MaxYMetres`); the listener's default stays at 2 m in front of
+          the array.
+        - `tools/fake_module.py --speaker-protocol 1` (outside the repo, in
+          `Ananas/tools`) announces protocol 1, prints the bundles it gets
+          and echoes the set id, for testing without the firmware.
+        - Still open: test with the firmware once it implements the
+          handover; a hint in the WFS tab that legacy modules clip sources
+          beyond their old range (±2.25 m, −3 … 10 m).
       - **Server side, independent of the firmware: done.**
         - `Speaker` has a height `z` and a facing direction (`Direction`, a
           3-D unit vector, default `(0, -1, 0)` towards the listener), in
@@ -210,9 +209,9 @@ Positions stay on the server; the firmware never stores or hardcodes them.
           and, with the custom layout, edits z (m), facing (degrees, 0
           towards the listener, counter-clockwise seen from above) and tilt
           (degrees above the horizontal).
-        - `checkLayout` warns about WFS speakers beyond ±2.25 m (clipped by
-          the current firmware) and WFS speakers pointing (almost) straight
-          up or down, and notes that WFS ignores heights.
+        - `checkLayout` warns about WFS speakers beyond the module's range
+          (±10 m, or ±2.25 m on legacy firmware) and WFS speakers pointing
+          (almost) straight up or down, and notes that WFS ignores heights.
         - The Ambisonics renderer's rmax uses 3-D distances
           (`RenderLayout::moduleHeights`).
         - Still open: a warning for speakers facing away from the listening
