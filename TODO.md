@@ -142,12 +142,13 @@ Positions stay on the server; the firmware never stores or hardcodes them.
 - [ ] **Speaker identification:** play noise on one module output at a time,
       to find which physical speaker is wired where. Needs a small firmware
       command for Ambisonics modules, whose stream doesn't address single
-      outputs.
+      outputs. Agreed with the firmware side to do this separately;
+      `/identify <j> <0|1>` is reserved for it.
 - [ ] **Protocol extensions: height, orientation and gain per output.**
-      Proposed to the firmware side in
-      `teensy-audiosync/docs/firmware-handover-speaker-geometry.md`, with
-      open questions at its end (gain default at boot, WFS range, WFS with
-      orientation, speaker identification in the same round). In short:
+      **Agreed** with the firmware side in
+      `teensy-audiosync/docs/firmware-handover-speaker-geometry.md`
+      (proposal, firmware response and server response; the responses win
+      where they differ). In short:
       one message per output, `/ss/<j>` with `x y z nx ny nz gain`
       (the facing direction is a 3-D unit vector; WFS uses its horizontal
       part, Ambisonics ignores it for now, and `nz` is reserved for tilted
@@ -156,15 +157,22 @@ Positions stay on the server; the firmware never stores or hardcodes them.
       reboot (comparing echoed positions misses outputs at (0, 0)); new
       announcement fields `speakerProtocol` and `speakerSetId`; modules
       without them keep getting `/ss/<j>/x|y` (legacy stereo modules
-      unchanged).
+      unchanged). From the responses: gain is 0 at boot until an output's
+      first position arrives; `/ss/id` is a `uint32` sent as `int32`, never
+      0; the announcement grows from 52 to 57 bytes.
       - **Why mute:** outputs no speaker uses get the position (0, 0) and
         play as a speaker at the origin; not sending a position isn't safe
         either, since modules keep whatever position they have. Only
         matters with custom layouts; in the linear array every output has a
         speaker.
-      - **WFS range:** the WFS firmware clamps speaker x and y to ±2.25 m
-        (`MAX_X`), so custom layouts with WFS speakers further out are
-        silently clipped today. The handover asks for a larger range.
+      - **Ranges:** the WFS firmware clamps speaker x and y and source x to
+        ±2.25 m (`MAX_X`), and source y to −3 … 10 m, so larger layouts and
+        sources beyond these are silently clipped today (sources too: the
+        server scales source x to `outerSpeakerX`). Agreed for protocol 1:
+        **WFS speakers ±10 m; sources x ±10 m, y −10 … +10 m**, so sources
+        can be anywhere in a room up to 20 m wide and 10 m deep, in front
+        of the array (focused) and behind it. Legacy modules keep their old
+        ranges; sources are multicast, so they just keep clamping.
       - **Server side, once the firmware has it:**
         - `Packet.h`: the two announcement fields; `ModuleInfo` stores them.
         - **First, merge the per-output data in `RenderLayout`.** Today
@@ -182,6 +190,15 @@ Positions stay on the server; the firmware never stores or hardcodes them.
           tests; doing it here means those places change once.
         - `RenderLayout::compute` records, per module output, whether a
           speaker uses it, its z and orientation (in `OutputGeometry`).
+        - Set ids: a `uint32` counter from 1 that skips 0, sent as `int32`.
+        - Ranges per protocol: `Constants::MaxXMetres` (2.25) becomes the
+          legacy limit, with ±10 m for protocol-1 modules, in `checkLayout`
+          and the array warning in the WFS tab.
+        - Source ranges: `Constants::MinYMetres` / `MaxYMetres` (−3 / 10)
+          become −10 / +10, and source x may reach ±10 m. This also moves
+          the array line to the middle of the XY view, and changes what a
+          y parameter value means (fine: saved projects needn't stay
+          compatible).
         - `sendSpeakerPositions`: for modules on protocol 1, one bundle with
           `/ss/id` and `/ss/<j>` for every output (gain 0 for unused ones),
           resent when the echoed id differs; protocol 0 unchanged.
