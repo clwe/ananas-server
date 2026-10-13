@@ -23,7 +23,19 @@ PluginEditor::PluginEditor(PluginProcessor &p)
           },
           getProcessor().getLinearArraySetup()
       ),
-      speakerTable(getProcessor().getDynamicTree())
+      speakerTable(
+          getProcessor().getDynamicTree(),
+          getProcessor().getPersistentTree(),
+          getProcessor().getCustomLayout(),
+          [this](const ananas::WFS::LayoutMode mode)
+          {
+              getProcessor().setLayoutMode(mode);
+          },
+          [this]
+          {
+              getProcessor().convertToCustomLayout();
+          }
+      )
 {
     juce::Desktop::getInstance().setDefaultLookAndFeel(&lookAndFeel);
 

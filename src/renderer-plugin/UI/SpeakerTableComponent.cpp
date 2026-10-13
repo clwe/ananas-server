@@ -12,21 +12,213 @@ namespace ananas::WFS::UI
                                      | juce::TableHeaderComponent::resizable
                                      | juce::TableHeaderComponent::appearsOnColumnMenu;
 
-        const TableColumns::ColumnHeader SpeakerColumn{1, "Speaker", 70, 30, -1, ColumnFlags, juce::Justification::centred};
-        const TableColumns::ColumnHeader XColumn{2, "x (m)", 80, 30, -1, ColumnFlags, juce::Justification::centredRight};
-        const TableColumns::ColumnHeader YColumn{3, "y (m)", 80, 30, -1, ColumnFlags, juce::Justification::centredRight};
-        const TableColumns::ColumnHeader ModuleColumn{4, "Module", 130, 30, -1, ColumnFlags, juce::Justification::centredLeft};
-        const TableColumns::ColumnHeader OutputColumn{5, "Output", 70, 30, -1, ColumnFlags, juce::Justification::centred};
-        const TableColumns::ColumnHeader ProblemsColumn{6, "Problems", 400, 30, -1, ColumnFlags, juce::Justification::centredLeft};
+        enum ColumnIds
+        {
+            speakerColumnId = 1,
+            xColumnId,
+            yColumnId,
+            moduleColumnId,
+            outputColumnId,
+            problemsColumnId,
+        };
+
+        const TableColumns::ColumnHeader SpeakerColumn{speakerColumnId, "Speaker", 70, 30, -1, ColumnFlags, juce::Justification::centred};
+        const TableColumns::ColumnHeader XColumn{xColumnId, "x (m)", 80, 30, -1, ColumnFlags, juce::Justification::centredRight};
+        const TableColumns::ColumnHeader YColumn{yColumnId, "y (m)", 80, 30, -1, ColumnFlags, juce::Justification::centredRight};
+        const TableColumns::ColumnHeader ModuleColumn{moduleColumnId, "Module", 200, 30, -1, ColumnFlags, juce::Justification::centredLeft};
+        const TableColumns::ColumnHeader OutputColumn{outputColumnId, "Output", 70, 30, -1, ColumnFlags, juce::Justification::centred};
+        const TableColumns::ColumnHeader ProblemsColumn{problemsColumnId, "Problems", 400, 30, -1, ColumnFlags, juce::Justification::centredLeft};
 
         constexpr auto Info = static_cast<int>(LayoutProblem::Severity::info);
         constexpr auto Warning = static_cast<int>(LayoutProblem::Severity::warning);
+
+        // Layout mode selector item IDs (0 is reserved by ComboBox).
+        constexpr int LinearArrayItemId = 1;
+        constexpr int CustomItemId = 2;
+
+        // Module cell: the first item means "no module".
+        constexpr int NoModuleItemId = 1;
+
+        juce::String formatMetres(const float value)
+        {
+            return juce::String{value, 3};
+        }
     }
 
-    SpeakerTableComponent::SpeakerTableComponent(juce::ValueTree &dynamicTree)
-        : speakerLayoutNode(dynamicTree.getChildWithName(Identifiers::SpeakerLayoutTreeType))
+    //==========================================================================
+    // Editable cells. JUCE reuses cell components for other rows, so each
+    // cell keeps its current row, and its callbacks read it from there.
+
+    // x or y, committed on return or when the editor loses focus.
+    class SpeakerTableComponent::Table::NumberCell final : public juce::TextEditor
+    {
+    public:
+        explicit NumberCell(Table &t) : table(t)
+        {
+            setMultiLine(false);
+            setJustification(juce::Justification::centredRight);
+            setInputRestrictions(0, "-0123456789.");
+            onReturnKey = [this] { commit(); };
+            onFocusLost = [this] { commit(); };
+            onEscapeKey = [this] { show(row, column); };
+        }
+
+        void show(const int rowNumber, const int columnId)
+        {
+            row = rowNumber;
+            column = columnId;
+            // Don't overwrite what the user is typing.
+            if (hasKeyboardFocus(true)) return;
+            const auto &r = table.rows[static_cast<size_t>(row)];
+            setText(formatMetres(column == xColumnId ? r.x : r.y), juce::dontSendNotification);
+        }
+
+    private:
+        void commit()
+        {
+            if (row >= table.getNumRows() || !table.onPositionEdited) return;
+
+            const auto &r = table.rows[static_cast<size_t>(row)];
+            const auto text = getText().trim();
+            if (text.isEmpty() || !text.containsAnyOf("0123456789")) {
+                setText(formatMetres(column == xColumnId ? r.x : r.y), juce::dontSendNotification);
+                return;
+            }
+
+            const auto value = text.getFloatValue();
+            const auto position = column == xColumnId ? juce::Point<float>{value, r.y} : juce::Point<float>{r.x, value};
+            table.onPositionEdited(r.index, position);
+        }
+
+        Table &table;
+        int row = 0;
+        int column = xColumnId;
+    };
+
+    // The module driving the speaker: the known modules, plus the current one
+    // if it isn't known.
+    class SpeakerTableComponent::Table::ModuleCell final : public juce::ComboBox
+    {
+    public:
+        explicit ModuleCell(Table &t) : table(t)
+        {
+            onChange = [this] { commit(); };
+        }
+
+        void show(const int rowNumber)
+        {
+            row = rowNumber;
+            const auto &r = table.rows[static_cast<size_t>(row)];
+
+            clear(juce::dontSendNotification);
+            ips.clear();
+
+            addItem(juce::String::fromUTF8("–"), NoModuleItemId);
+            ips.add({});
+
+            for (const auto &m: table.modules) {
+                ips.add(m.ip);
+                addItem(m.label, ips.size());
+            }
+            if (r.moduleIp.isNotEmpty() && !ips.contains(r.moduleIp)) {
+                ips.add(r.moduleIp);
+                addItem(r.moduleIp + " (unknown)", ips.size());
+            }
+
+            setSelectedId(ips.indexOf(r.moduleIp) + 1, juce::dontSendNotification);
+        }
+
+    private:
+        void commit()
+        {
+            if (row >= table.getNumRows() || !table.onModuleEdited) return;
+
+            const auto &r = table.rows[static_cast<size_t>(row)];
+            const auto ip = ips[getSelectedId() - 1];
+            if (ip == r.moduleIp) return;
+
+            // Keep the output if the new module has it; start at 0 otherwise.
+            auto output = -1;
+            if (ip.isNotEmpty()) {
+                const auto *m = table.findModule(ip);
+                output = m != nullptr && r.output >= 0 && r.output < m->numOutputs ? r.output : 0;
+            }
+            table.onModuleEdited(r.index, ip, output);
+        }
+
+        Table &table;
+        int row = 0;
+        // The IP of each item, by item ID - 1.
+        juce::StringArray ips;
+    };
+
+    // The module output driving the speaker: the outputs the module has, plus
+    // the current one if it doesn't have it.
+    class SpeakerTableComponent::Table::OutputCell final : public juce::ComboBox
+    {
+    public:
+        explicit OutputCell(Table &t) : table(t)
+        {
+            onChange = [this] { commit(); };
+        }
+
+        void show(const int rowNumber)
+        {
+            row = rowNumber;
+            const auto &r = table.rows[static_cast<size_t>(row)];
+
+            clear(juce::dontSendNotification);
+            setEnabled(r.moduleIp.isNotEmpty());
+            if (r.moduleIp.isEmpty()) return;
+
+            const auto *m = table.findModule(r.moduleIp);
+            const auto numOutputs = m != nullptr ? m->numOutputs : 0;
+            // Item ID = output + 1.
+            for (int output = 0; output < numOutputs; ++output) {
+                addItem(juce::String{output}, output + 1);
+            }
+            if (r.output >= numOutputs) {
+                addItem(juce::String{r.output} + " (doesn't exist)", r.output + 1);
+            }
+
+            setSelectedId(r.output + 1, juce::dontSendNotification);
+        }
+
+    private:
+        void commit()
+        {
+            if (row >= table.getNumRows() || !table.onModuleEdited) return;
+
+            const auto &r = table.rows[static_cast<size_t>(row)];
+            const auto output = getSelectedId() - 1;
+            if (output < 0 || output == r.output) return;
+            table.onModuleEdited(r.index, r.moduleIp, output);
+        }
+
+        Table &table;
+        int row = 0;
+    };
+
+    //==========================================================================
+
+    SpeakerTableComponent::SpeakerTableComponent(juce::ValueTree &dynamicTree,
+                                                 juce::ValueTree &persistentTree,
+                                                 CustomLayout &customLayoutRef,
+                                                 std::function<void(LayoutMode)> onLayoutModeSelectedCallback,
+                                                 std::function<void()> onConvertToCustomLayoutCallback)
+        : customLayout(customLayoutRef),
+          onLayoutModeSelected(std::move(onLayoutModeSelectedCallback)),
+          onConvertToCustomLayout(std::move(onConvertToCustomLayoutCallback)),
+          speakerLayoutNode(dynamicTree.getChildWithName(Identifiers::SpeakerLayoutTreeType)),
+          layoutNode(persistentTree.getChildWithName(Identifiers::LayoutTreeType)),
+          modulesNode(persistentTree.getChildWithName(::ananas::Utils::Identifiers::ModulesParamID))
     {
         addAndMakeVisible(title);
+        addAndMakeVisible(layoutModeLabel);
+        addAndMakeVisible(layoutModeSelector);
+        addAndMakeVisible(convertButton);
+        addChildComponent(addSpeakerButton);
+        addChildComponent(removeSpeakersButton);
         addAndMakeVisible(table);
         addAndMakeVisible(moduleProblemsLabel);
 
@@ -34,23 +226,81 @@ namespace ananas::WFS::UI
         title.setJustificationType(juce::Justification::centredLeft);
         title.setText("Speakers", juce::dontSendNotification);
 
+        layoutModeLabel.setText("Layout", juce::dontSendNotification);
+        layoutModeLabel.setJustificationType(juce::Justification::centredRight);
+        layoutModeSelector.addItem("Linear array", LinearArrayItemId);
+        layoutModeSelector.addItem("Custom", CustomItemId);
+        layoutModeSelector.onChange = [this]
+        {
+            if (onLayoutModeSelected) {
+                onLayoutModeSelected(layoutModeSelector.getSelectedId() == CustomItemId ? LayoutMode::custom
+                                                                                          : LayoutMode::linearArray);
+            }
+        };
+
+        convertButton.setButtonText("Copy linear array to custom");
+        convertButton.setTooltip("Replaces the custom layout with the speakers of the linear array, "
+                                 "including their modules, and switches to it.");
+        convertButton.onClick = [this] { confirmConvertToCustomLayout(); };
+
+        addSpeakerButton.setButtonText("Add speaker");
+        addSpeakerButton.onClick = [this] { customLayout.addSpeaker(); };
+
+        removeSpeakersButton.setButtonText("Remove selected");
+        removeSpeakersButton.onClick = [this]
+        {
+            // From the last, so the indices of the others stay valid.
+            const auto selected = table.getSelectedRows();
+            for (int i = selected.size() - 1; i >= 0; --i) {
+                customLayout.removeSpeaker(selected[i]);
+            }
+        };
+
+        table.onPositionEdited = [this](const int index, const juce::Point<float> position)
+        {
+            customLayout.setPosition(index, position);
+        };
+        table.onModuleEdited = [this](const int index, const juce::String &ip, const int output)
+        {
+            customLayout.setModule(index, ip, output);
+        };
+
         moduleProblemsLabel.setJustificationType(juce::Justification::topLeft);
         moduleProblemsLabel.setColour(juce::Label::textColourId, juce::Colours::darkorange.darker(.3f));
 
         speakerLayoutNode.addListener(this);
+        layoutNode.addListener(this);
+        modulesNode.addListener(this);
         update();
     }
 
     SpeakerTableComponent::~SpeakerTableComponent()
     {
         speakerLayoutNode.removeListener(this);
+        layoutNode.removeListener(this);
+        modulesNode.removeListener(this);
         cancelPendingUpdate();
     }
 
     void SpeakerTableComponent::resized()
     {
         auto bounds = getLocalBounds().reduced(10);
-        title.setBounds(bounds.removeFromTop(30));
+
+        auto top = bounds.removeFromTop(30);
+        title.setBounds(top.removeFromLeft(120));
+        convertButton.setBounds(top.removeFromRight(220).reduced(2));
+        top.removeFromRight(10);
+        layoutModeSelector.setBounds(top.removeFromRight(140).reduced(2));
+        layoutModeLabel.setBounds(top.removeFromRight(60));
+
+        bounds.removeFromTop(5);
+        if (addSpeakerButton.isVisible()) {
+            auto buttons = bounds.removeFromBottom(30);
+            addSpeakerButton.setBounds(buttons.removeFromLeft(120).reduced(2));
+            removeSpeakersButton.setBounds(buttons.removeFromLeft(140).reduced(2));
+            bounds.removeFromBottom(5);
+        }
+
         moduleProblemsLabel.setBounds(bounds.removeFromBottom(moduleProblemsLabel.getText().isEmpty() ? 0 : 80));
         table.setBounds(bounds);
     }
@@ -79,8 +329,29 @@ namespace ananas::WFS::UI
 
     void SpeakerTableComponent::update()
     {
-        std::vector<Table::Row> rows;
+        const auto isCustom = layoutModeFromString(layoutNode[Identifiers::LayoutModePropertyID].toString())
+                              == LayoutMode::custom;
 
+        layoutModeSelector.setSelectedId(isCustom ? CustomItemId : LinearArrayItemId, juce::dontSendNotification);
+        addSpeakerButton.setVisible(isCustom);
+        removeSpeakersButton.setVisible(isCustom);
+
+        std::vector<ModuleOption> modules;
+        // All known modules, so a speaker can keep (and be given) a module
+        // that's offline; checkLayout warns about those.
+        for (const auto &module: modulesNode) {
+            const auto ip = module[::ananas::Utils::Identifiers::ModuleIpPropertyID].toString();
+            const auto type = static_cast<::ananas::Utils::FirmwareType>(
+                static_cast<int>(module[::ananas::Utils::Identifiers::ModuleFirmwareTypePropertyID]));
+            const int numOutputs = module[::ananas::Utils::Identifiers::ModuleNumSpeakersPropertyID];
+            const bool isConnected = module[::ananas::Utils::Identifiers::ModuleIsConnectedPropertyID];
+            modules.push_back({ip,
+                               ip + " (" + ::ananas::Utils::FirmwareTypeToString(type)
+                               + (isConnected ? ")" : ", not connected)"),
+                               numOutputs});
+        }
+
+        std::vector<Table::Row> rows;
         for (const auto &speaker: speakerLayoutNode) {
             if (!speaker.hasType(Identifiers::SpeakerTreeType)) continue;
 
@@ -96,14 +367,36 @@ namespace ananas::WFS::UI
             rows.push_back(std::move(row));
         }
 
-        table.setRows(std::move(rows));
+        table.setRows(std::move(rows), std::move(modules), isCustom);
 
         const auto moduleProblems = speakerLayoutNode[Identifiers::SpeakerLayoutModuleProblemsPropertyID].toString();
-        if (moduleProblems != moduleProblemsLabel.getText()) {
-            moduleProblemsLabel.setText(moduleProblems, juce::dontSendNotification);
-            moduleProblemsLabel.setTooltip(moduleProblems);
-            resized();
+        moduleProblemsLabel.setText(moduleProblems, juce::dontSendNotification);
+        moduleProblemsLabel.setTooltip(moduleProblems);
+        resized();
+    }
+
+    void SpeakerTableComponent::confirmConvertToCustomLayout()
+    {
+        if (customLayout.getLayout().getSpeakers().empty()) {
+            if (onConvertToCustomLayout) onConvertToCustomLayout();
+            return;
         }
+
+        const auto options = juce::MessageBoxOptions()
+                .withIconType(juce::MessageBoxIconType::QuestionIcon)
+                .withTitle("Replace the custom layout?")
+                .withMessage("The custom layout's speakers will be replaced by those of the linear array.")
+                .withButton("Replace")
+                .withButton("Cancel")
+                .withAssociatedComponent(this);
+
+        juce::AlertWindow::showAsync(options, [safeThis = juce::Component::SafePointer{this}](const int result)
+        {
+            // The first button returns 1.
+            if (result == 1 && safeThis != nullptr && safeThis->onConvertToCustomLayout) {
+                safeThis->onConvertToCustomLayout();
+            }
+        });
     }
 
     //==========================================================================
@@ -121,13 +414,22 @@ namespace ananas::WFS::UI
 
         table.setModel(this);
         table.setOutlineThickness(1);
+        table.setMultipleSelectionEnabled(true);
     }
 
-    void SpeakerTableComponent::Table::setRows(std::vector<Row> newRows)
+    void SpeakerTableComponent::Table::setRows(std::vector<Row> newRows, std::vector<ModuleOption> newModules,
+                                               const bool isEditable)
     {
         rows = std::move(newRows);
+        modules = std::move(newModules);
+        editable = isEditable;
         table.updateContent();
         table.repaint();
+    }
+
+    juce::SparseSet<int> SpeakerTableComponent::Table::getSelectedRows() const
+    {
+        return table.getSelectedRows();
     }
 
     int SpeakerTableComponent::Table::getNumRows()
@@ -147,7 +449,7 @@ namespace ananas::WFS::UI
 
         // Tint rows with problems, so they stand out in a long list.
         if (rowNumber < getNumRows() && rows[static_cast<size_t>(rowNumber)].severity >= Warning) {
-            g.fillAll(findColour(AnanasNetworkTable::warningColourId).withAlpha(.25f));
+            g.fillAll(findColour(warningColourId).withAlpha(.25f));
         }
     }
 
@@ -156,21 +458,24 @@ namespace ananas::WFS::UI
     {
         if (rowNumber >= getNumRows()) return;
 
+        // Editable cells are drawn by their components.
+        if (editable && columnId >= xColumnId && columnId <= outputColumnId) return;
+
         const auto &row = rows[static_cast<size_t>(rowNumber)];
         juce::String text;
 
         switch (columnId) {
-            case 1: text = juce::String{row.index + 1};
+            case speakerColumnId: text = juce::String{row.index + 1};
                 break;
-            case 2: text = juce::String{row.x, 3};
+            case xColumnId: text = formatMetres(row.x);
                 break;
-            case 3: text = juce::String{row.y, 3};
+            case yColumnId: text = formatMetres(row.y);
                 break;
-            case 4: text = row.moduleIp.isEmpty() ? juce::String{"-"} : row.moduleIp;
+            case moduleColumnId: text = row.moduleIp.isEmpty() ? juce::String::fromUTF8("–") : row.moduleIp;
                 break;
-            case 5: text = row.output < 0 ? juce::String{"-"} : juce::String{row.output};
+            case outputColumnId: text = row.output < 0 ? juce::String::fromUTF8("–") : juce::String{row.output};
                 break;
-            case 6:
+            case problemsColumnId:
                 if (!row.problems.isEmpty()) {
                     text = row.problems[0];
                     if (row.problems.size() > 1) {
@@ -181,10 +486,50 @@ namespace ananas::WFS::UI
             default: break;
         }
 
-        const auto isInfoOnly = columnId == 6 && row.severity == Info;
-        g.setColour(findColour(AnanasNetworkTable::textColourId).withAlpha(isInfoOnly ? .5f : 1.f));
+        const auto isInfoOnly = columnId == problemsColumnId && row.severity == Info;
+        g.setColour(findColour(textColourId).withAlpha(isInfoOnly ? .5f : 1.f));
         g.setFont(juce::Font{juce::FontOptions{14.f}});
         g.drawText(text, 2, 0, width - 4, height, getJustification(columnId), true);
+    }
+
+    juce::Component *SpeakerTableComponent::Table::refreshComponentForCell(const int rowNumber, const int columnId, bool,
+                                                                           juce::Component *existing)
+    {
+        const auto wantsComponent = editable && rowNumber < getNumRows()
+                                    && columnId >= xColumnId && columnId <= outputColumnId;
+
+        if (!wantsComponent) {
+            delete existing;
+            return nullptr;
+        }
+
+        if (columnId == xColumnId || columnId == yColumnId) {
+            auto *cell = dynamic_cast<NumberCell *>(existing);
+            if (cell == nullptr) {
+                delete existing;
+                cell = new NumberCell{*this};
+            }
+            cell->show(rowNumber, columnId);
+            return cell;
+        }
+
+        if (columnId == moduleColumnId) {
+            auto *cell = dynamic_cast<ModuleCell *>(existing);
+            if (cell == nullptr) {
+                delete existing;
+                cell = new ModuleCell{*this};
+            }
+            cell->show(rowNumber);
+            return cell;
+        }
+
+        auto *cell = dynamic_cast<OutputCell *>(existing);
+        if (cell == nullptr) {
+            delete existing;
+            cell = new OutputCell{*this};
+        }
+        cell->show(rowNumber);
+        return cell;
     }
 
     juce::String SpeakerTableComponent::Table::getCellTooltip(const int rowNumber, int)
@@ -196,5 +541,13 @@ namespace ananas::WFS::UI
     void SpeakerTableComponent::Table::resized()
     {
         table.setBounds(getLocalBounds());
+    }
+
+    const SpeakerTableComponent::ModuleOption *SpeakerTableComponent::Table::findModule(const juce::String &ip) const
+    {
+        for (const auto &m: modules) {
+            if (m.ip == ip) return &m;
+        }
+        return nullptr;
     }
 }
