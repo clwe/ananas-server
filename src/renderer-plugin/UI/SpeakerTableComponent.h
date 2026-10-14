@@ -5,6 +5,7 @@
 #include <AnanasNetworkTable.h>
 #include "../CustomLayout.h"
 #include "../LayoutFile.h"
+#include "LayoutView.h"
 
 namespace ananas::WFS::UI
 {
@@ -20,7 +21,8 @@ namespace ananas::WFS::UI
      */
     class SpeakerTableComponent final : public juce::Component,
                                         public juce::ValueTree::Listener,
-                                        juce::AsyncUpdater
+                                        juce::AsyncUpdater,
+                                        juce::Timer
     {
     public:
         SpeakerTableComponent(juce::ValueTree &dynamicTree,
@@ -43,6 +45,9 @@ namespace ananas::WFS::UI
         void valueTreeChildRemoved(juce::ValueTree &parent, juce::ValueTree &child, int index) override;
 
         void handleAsyncUpdate() override;
+
+        // Follows the listener, which isn't in the trees, while shown.
+        void timerCallback() override;
 
     private:
         // A module the user can assign speakers to.
@@ -75,6 +80,12 @@ namespace ananas::WFS::UI
             void setRows(std::vector<Row> newRows, std::vector<ModuleOption> newModules, bool isEditable);
 
             [[nodiscard]] juce::SparseSet<int> getSelectedRows() const;
+
+            void setSelectedRows(const juce::SparseSet<int> &selection);
+
+            void selectedRowsChanged(int lastRowSelected) override;
+
+            std::function<void(const juce::SparseSet<int> &)> onSelectionChanged;
 
             int getNumRows() override;
 
@@ -156,6 +167,7 @@ namespace ananas::WFS::UI
         // The modules offered by assignModuleButton, as of the last update().
         std::vector<ModuleOption> moduleOptions;
         Table table;
+        LayoutView layoutView;
         // Problems that concern a module rather than a speaker.
         juce::Label moduleProblemsLabel;
 

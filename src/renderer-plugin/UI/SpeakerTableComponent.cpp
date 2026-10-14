@@ -284,6 +284,7 @@ namespace ananas::WFS::UI
         addChildComponent(removeSpeakersButton);
         addChildComponent(assignModuleButton);
         addAndMakeVisible(table);
+        addAndMakeVisible(layoutView);
         addAndMakeVisible(moduleProblemsLabel);
 
         title.setFont(juce::Font{juce::FontOptions{18.f, juce::Font::bold}});
@@ -358,6 +359,26 @@ namespace ananas::WFS::UI
         moduleProblemsLabel.setJustificationType(juce::Justification::topLeft);
         moduleProblemsLabel.setColour(juce::Label::textColourId, juce::Colours::darkorange.darker(.3f));
 
+        // Selection is shared between the table and the view.
+        table.onSelectionChanged = [this](const juce::SparseSet<int> &selection)
+        {
+            layoutView.setSelection(selection);
+        };
+        layoutView.onSpeakerClicked = [this](const int index, const juce::ModifierKeys &modifiers)
+        {
+            auto selection = table.getSelectedRows();
+            if (modifiers.isCommandDown() || modifiers.isShiftDown()) {
+                // Add or remove one speaker; empty space changes nothing.
+                if (index < 0) return;
+                if (selection.contains(index)) selection.removeRange({index, index + 1});
+                else selection.addRange({index, index + 1});
+            } else {
+                selection.clear();
+                if (index >= 0) selection.addRange({index, index + 1});
+            }
+            table.setSelectedRows(selection);
+        };
+
         speakerLayoutNode.addListener(this);
         layoutNode.addListener(this);
         modulesNode.addListener(this);
@@ -370,6 +391,7 @@ namespace ananas::WFS::UI
         layoutNode.removeListener(this);
         modulesNode.removeListener(this);
         cancelPendingUpdate();
+        stopTimer();
     }
 
     void SpeakerTableComponent::resized()
@@ -397,7 +419,18 @@ namespace ananas::WFS::UI
         }
 
         moduleProblemsLabel.setBounds(bounds.removeFromBottom(moduleProblemsLabel.getText().isEmpty() ? 0 : 80));
+
+        // The table on the left, the view on the right.
+        layoutView.setBounds(bounds.removeFromRight(juce::roundToInt(static_cast<float>(bounds.getWidth()) * .42f)));
+        bounds.removeFromRight(10);
         table.setBounds(bounds);
+    }
+
+    void SpeakerTableComponent::timerCallback()
+    {
+        if (isShowing() && getListenerPosition) {
+            layoutView.setListener(getListenerPosition());
+        }
     }
 
     // A change to one speaker comes as several notifications (one per
@@ -466,6 +499,15 @@ namespace ananas::WFS::UI
             row.problems.removeEmptyStrings();
             rows.push_back(std::move(row));
         }
+
+        std::vector<LayoutView::ViewSpeaker> viewSpeakers;
+        for (const auto &row: rows) {
+            viewSpeakers.push_back({row.index, {row.x, row.y}, row.z, row.facing, row.moduleIp, row.severity});
+        }
+        layoutView.setSpeakers(std::move(viewSpeakers));
+        layoutView.setSelection(table.getSelectedRows());
+        if (getListenerPosition) layoutView.setListener(getListenerPosition());
+        if (!isTimerRunning()) startTimerHz(5);
 
         moduleOptions = modules;
         table.setRows(std::move(rows), std::move(modules), isCustom);
@@ -706,6 +748,16 @@ namespace ananas::WFS::UI
     juce::SparseSet<int> SpeakerTableComponent::Table::getSelectedRows() const
     {
         return table.getSelectedRows();
+    }
+
+    void SpeakerTableComponent::Table::setSelectedRows(const juce::SparseSet<int> &selection)
+    {
+        table.setSelectedRows(selection);
+    }
+
+    void SpeakerTableComponent::Table::selectedRowsChanged(int)
+    {
+        if (onSelectionChanged) onSelectionChanged(table.getSelectedRows());
     }
 
     int SpeakerTableComponent::Table::getNumRows()
