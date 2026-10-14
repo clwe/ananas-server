@@ -104,6 +104,9 @@ public:
     // The speakers the renderers use now, from either layout.
     [[nodiscard]] const ananas::WFS::SpeakerLayout &getSpeakerLayout() const;
 
+    // The Ambisonics listening point, in metres in the array frame.
+    [[nodiscard]] juce::Point<float> getListenerPosition() const;
+
 private:
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(PluginProcessor)
 

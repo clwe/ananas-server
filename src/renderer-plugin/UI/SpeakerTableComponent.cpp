@@ -2,6 +2,7 @@
 #include "../LayoutCheck.h"
 #include "../WFSUtils.h"
 #include "../LayoutFile.h"
+#include "../IemLayout.h"
 
 namespace ananas::WFS::UI
 {
@@ -261,12 +262,14 @@ namespace ananas::WFS::UI
                                                  std::function<void(LayoutMode)> onLayoutModeSelectedCallback,
                                                  std::function<void()> onConvertToCustomLayoutCallback,
                                                  std::function<const SpeakerLayout &()> getLayoutToSaveCallback,
-                                                 std::function<void(std::vector<Speaker>)> onLayoutLoadedCallback)
+                                                 std::function<void(std::vector<Speaker>)> onLayoutLoadedCallback,
+                                                 std::function<juce::Point<float>()> getListenerPositionCallback)
         : customLayout(customLayoutRef),
           onLayoutModeSelected(std::move(onLayoutModeSelectedCallback)),
           onConvertToCustomLayout(std::move(onConvertToCustomLayoutCallback)),
           getLayoutToSave(std::move(getLayoutToSaveCallback)),
           onLayoutLoaded(std::move(onLayoutLoadedCallback)),
+          getListenerPosition(std::move(getListenerPositionCallback)),
           speakerLayoutNode(dynamicTree.getChildWithName(Identifiers::SpeakerLayoutTreeType)),
           layoutNode(persistentTree.getChildWithName(Identifiers::LayoutTreeType)),
           modulesNode(persistentTree.getChildWithName(::ananas::Utils::Identifiers::ModulesParamID))
@@ -312,7 +315,8 @@ namespace ananas::WFS::UI
         saveButton.onClick = [this] { saveLayout(); };
 
         loadButton.setButtonText("Load layout...");
-        loadButton.setTooltip("Loads a speaker layout file into the custom layout, and switches to it.");
+        loadButton.setTooltip("Loads a speaker layout file (Ananas, or an IEM loudspeaker layout) into the "
+                              "custom layout, and switches to it.");
         loadButton.onClick = [this] { loadLayout(); };
 
         addSpeakerButton.setButtonText("Add speaker");
@@ -528,33 +532,82 @@ namespace ananas::WFS::UI
             const auto file = chooser.getResult();
             if (safeThis == nullptr || file == juce::File{}) return;
 
-            auto result = LayoutFile::fromJson(file.loadFileAsString());
+            const auto text = file.loadFileAsString();
 
-            if (!result.wasLoaded()) {
-                juce::AlertWindow::showAsync(juce::MessageBoxOptions::makeOptionsOk(
-                                                 juce::MessageBoxIconType::WarningIcon,
-                                                 "Couldn't load " + file.getFileName(),
-                                                 result.errors.joinIntoString("\n")),
-                                             nullptr);
+            // IEM layouts give directions; they need a radius and a centre first.
+            if (const auto json = juce::JSON::parse(text); IemLayout::isIemLayout(json)) {
+                safeThis->askIemPlacement(file.getFileName(), json);
                 return;
             }
 
-            safeThis->confirmReplacingCustomLayout(
-                "The custom layout's speakers will be replaced by those in " + file.getFileName() + ".",
-                [safeThis, speakers = std::move(result.speakers), warnings = result.warnings, name = file.getFileName()]
-                {
-                    if (safeThis == nullptr || !safeThis->onLayoutLoaded) return;
-                    safeThis->onLayoutLoaded(speakers);
-
-                    if (!warnings.isEmpty()) {
-                        juce::AlertWindow::showAsync(juce::MessageBoxOptions::makeOptionsOk(
-                                                         juce::MessageBoxIconType::InfoIcon,
-                                                         "Loaded " + name,
-                                                         warnings.joinIntoString("\n")),
-                                                     nullptr);
-                    }
-                });
+            safeThis->applyLoadedLayout(LayoutFile::fromJson(text), file.getFileName());
         });
+    }
+
+    void SpeakerTableComponent::askIemPlacement(const juce::String &fileName, const juce::var &json)
+    {
+        const auto listener = getListenerPosition ? getListenerPosition() : juce::Point<float>{0.f, -2.f};
+        // Layouts with all radii 1 only give directions: ask for the real
+        // distance. Others are in metres already: ask for a scale.
+        const auto unitRadii = IemLayout::hasUnitRadii(json);
+
+        auto *window = new juce::AlertWindow(
+            "Import " + fileName,
+            juce::String{"An IEM loudspeaker layout gives directions as seen from the listening position. "}
+            + (unitRadii ? "All its radii are 1, so enter the real distance of the speakers from the centre. "
+                         : "Its radii are multiplied by the scale below. ")
+            + "The speakers are placed around the centre, facing it, without modules.",
+            juce::MessageBoxIconType::QuestionIcon);
+
+        window->addTextEditor("radius", unitRadii ? "2.0" : "1.0", unitRadii ? "Radius (m)" : "Scale radii by");
+        window->addTextEditor("x", juce::String{listener.x, 3}, "Centre x (m)");
+        window->addTextEditor("y", juce::String{listener.y, 3}, "Centre y (m)");
+        window->addButton("Import", 1, juce::KeyPress{juce::KeyPress::returnKey});
+        window->addButton("Cancel", 0, juce::KeyPress{juce::KeyPress::escapeKey});
+
+        window->enterModalState(true, juce::ModalCallbackFunction::create(
+                                    [safeThis = juce::Component::SafePointer{this}, window, json, fileName](const int result)
+                                    {
+                                        // Runs before the window is deleted.
+                                        if (result != 1 || safeThis == nullptr) return;
+
+                                        const auto scale = window->getTextEditorContents("radius").getFloatValue();
+                                        const juce::Point<float> centre{
+                                            window->getTextEditorContents("x").getFloatValue(),
+                                            window->getTextEditorContents("y").getFloatValue()
+                                        };
+                                        safeThis->applyLoadedLayout(IemLayout::read(json, centre, scale), fileName);
+                                    }),
+                                true);
+    }
+
+    void SpeakerTableComponent::applyLoadedLayout(LayoutFile::ReadResult result, const juce::String &fileName)
+    {
+        if (!result.wasLoaded()) {
+            juce::AlertWindow::showAsync(juce::MessageBoxOptions::makeOptionsOk(
+                                             juce::MessageBoxIconType::WarningIcon,
+                                             "Couldn't load " + fileName,
+                                             result.errors.joinIntoString("\n")),
+                                         nullptr);
+            return;
+        }
+
+        confirmReplacingCustomLayout(
+            "The custom layout's speakers will be replaced by those in " + fileName + ".",
+            [safeThis = juce::Component::SafePointer{this}, speakers = std::move(result.speakers),
+                warnings = result.warnings, fileName]
+            {
+                if (safeThis == nullptr || !safeThis->onLayoutLoaded) return;
+                safeThis->onLayoutLoaded(speakers);
+
+                if (!warnings.isEmpty()) {
+                    juce::AlertWindow::showAsync(juce::MessageBoxOptions::makeOptionsOk(
+                                                     juce::MessageBoxIconType::InfoIcon,
+                                                     "Loaded " + fileName,
+                                                     warnings.joinIntoString("\n")),
+                                                 nullptr);
+                }
+            });
     }
 
     //==========================================================================

@@ -42,6 +42,10 @@ PluginEditor::PluginEditor(PluginProcessor &p)
           [this](std::vector<ananas::WFS::Speaker> speakers)
           {
               getProcessor().loadCustomLayout(std::move(speakers));
+          },
+          [this]
+          {
+              return getProcessor().getListenerPosition();
           }
       )
 {

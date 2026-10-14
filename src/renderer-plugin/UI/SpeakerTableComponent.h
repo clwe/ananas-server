@@ -4,6 +4,7 @@
 #include <juce_gui_basics/juce_gui_basics.h>
 #include <AnanasNetworkTable.h>
 #include "../CustomLayout.h"
+#include "../LayoutFile.h"
 
 namespace ananas::WFS::UI
 {
@@ -28,7 +29,8 @@ namespace ananas::WFS::UI
                               std::function<void(LayoutMode)> onLayoutModeSelected,
                               std::function<void()> onConvertToCustomLayout,
                               std::function<const SpeakerLayout &()> getLayoutToSave,
-                              std::function<void(std::vector<Speaker>)> onLayoutLoaded);
+                              std::function<void(std::vector<Speaker>)> onLayoutLoaded,
+                              std::function<juce::Point<float>()> getListenerPosition);
 
         ~SpeakerTableComponent() override;
 
@@ -115,13 +117,22 @@ namespace ananas::WFS::UI
 
         void saveLayout();
 
+        // Ananas layout files, and IEM loudspeaker layouts (which first ask
+        // for the radius and the centre).
         void loadLayout();
+
+        void askIemPlacement(const juce::String &fileName, const juce::var &json);
+
+        // Shows errors, or asks before replacing the custom layout, then
+        // loads the speakers and shows any warnings.
+        void applyLoadedLayout(LayoutFile::ReadResult result, const juce::String &fileName);
 
         CustomLayout &customLayout;
         std::function<void(LayoutMode)> onLayoutModeSelected;
         std::function<void()> onConvertToCustomLayout;
         std::function<const SpeakerLayout &()> getLayoutToSave;
         std::function<void(std::vector<Speaker>)> onLayoutLoaded;
+        std::function<juce::Point<float>()> getListenerPosition;
         // Kept while its dialog is open.
         std::unique_ptr<juce::FileChooser> fileChooser;
 

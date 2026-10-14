@@ -347,6 +347,15 @@ const ananas::WFS::SpeakerLayout &PluginProcessor::getSpeakerLayout() const
     return speakerLayout;
 }
 
+juce::Point<float> PluginProcessor::getListenerPosition() const
+{
+    return {
+        ananas::WFS::Params::positionXToMetres(apvts.getRawParameterValue(ananas::WFS::Params::ListenerX.id)->load(),
+                                               renderLayout.outerSpeakerX),
+        ananas::WFS::Params::positionYToMetres(apvts.getRawParameterValue(ananas::WFS::Params::ListenerY.id)->load())
+    };
+}
+
 ananas::WFS::LinearArray PluginProcessor::generateLinearArray() const
 {
     return ananas::WFS::generateLinearArray(linearArraySetup.getSettings(), server->getModuleList()->getEntries());

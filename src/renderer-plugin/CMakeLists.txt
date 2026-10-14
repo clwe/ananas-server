@@ -45,6 +45,7 @@ target_sources(ananasRenderer
         LinearArray.cpp
         CustomLayout.cpp
         LayoutFile.cpp
+        IemLayout.cpp
         LayoutCheck.cpp
         PluginEditor.cpp
         PluginProcessor.cpp
