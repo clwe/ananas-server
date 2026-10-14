@@ -8,8 +8,8 @@ namespace ananas::WFS::UI
 {
     /**
      * Top-down view of a speaker layout, to scale (the same scale on both
-     * axes), zoomed to fit the speakers, the listener and any extra area
-     * (e.g. where sources can be). x is to the right; the array frame's +y
+     * axes), zoomed to fit the speakers and the listener, times a zoom
+     * factor. x is to the right; the array frame's +y
      * (behind the array) is up, so the listener (y < 0) is below the array
      * line.
      *
@@ -35,10 +35,21 @@ namespace ananas::WFS::UI
 
         void setSpeakers(std::vector<ViewSpeaker> newSpeakers);
 
+        // Drawn, and fitted, unless drawn elsewhere (e.g. as a draggable node).
         void setListener(std::optional<juce::Point<float>> listenerPosition);
 
-        // An area (metres, array frame) the view also fits, and draws faintly.
+        // An area (metres, array frame) drawn faintly, e.g. where sources can
+        // be; not fitted, so a large range doesn't shrink the speakers.
         void setExtraArea(std::optional<juce::Rectangle<float>> area);
+
+        // Relative to fitting the speakers (and listener): 1 fits, 2 shows
+        // half as much, ... Clamped to a sensible range.
+        void setZoom(float factor);
+
+        [[nodiscard]] float getZoom() const;
+
+        // Called whenever toView() / toMetres() change (size, contents, zoom).
+        std::function<void()> onTransformChanged;
 
         // Speaker indices to highlight.
         void setSelection(const juce::SparseSet<int> &selection);
@@ -74,6 +85,7 @@ namespace ananas::WFS::UI
         // View = metres * scale, flipped in y, plus offset.
         float scale = 1.f;
         juce::Point<float> offset;
+        float zoom = 1.f;
 
         JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(LayoutView)
     };

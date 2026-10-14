@@ -59,7 +59,6 @@ target_sources(ananasRenderer
         UI/SpeakerTableComponent.cpp
         UI/LayoutView.cpp
         UI/XYControllerComponent.cpp
-        UI/SpeakerIconComponent.cpp
         UI/ModuleComponent.cpp
         UI/WfsLookAndFeel.cpp
 )

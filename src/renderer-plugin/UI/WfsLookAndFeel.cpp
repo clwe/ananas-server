@@ -20,40 +20,6 @@ namespace ananas::WFS::UI
         setColour(XYControllerComponent::Node::backgroundColourId, juce::Colours::white.withAlpha(0.5f));
         setColour(XYControllerComponent::Node::borderColourId, juce::Colours::lightseagreen);
         setColour(XYControllerComponent::Node::textColourId, darkColour);
-
-        // Speaker icons
-        setColour(SpeakerIconComponent::fillColourId, juce::Colours::lightgrey);
-        setColour(SpeakerIconComponent::borderColourId, juce::Colours::darkgrey);
-    }
-
-    void WfsLookAndFeel::drawXYController(juce::Graphics &g, const XYControllerComponent &xy)
-    {
-        g.fillAll(xy.findColour(XYControllerComponent::backgroundColourId));
-
-        g.setColour(xy.findColour(XYControllerComponent::gridLineColourId));
-
-        const auto bounds{xy.getBounds().toFloat()};
-        const auto right{bounds.getRight()};
-
-        if (xy.getGridSpacingX() > 0) {
-            // Draw positive x grid lines, one per metre
-            for (int x{xy.getWidth() / 2}; x < xy.getWidth(); x += xy.getGridSpacingX()) {
-                g.drawVerticalLine(x, 0.f, bounds.getHeight());
-            }
-
-            // Draw negative x grid lines
-            for (int x{xy.getWidth() / 2 - xy.getGridSpacingX()}; x > 0; x -= xy.getGridSpacingX()) {
-                g.drawVerticalLine(x, 0.f, bounds.getHeight());
-            }
-        }
-
-        const auto yZero{xy.getMaxYMetres() * xy.getHeight() / (xy.getMaxYMetres() - xy.getMinYMetres())};
-        const auto unit{xy.getHeight() / (xy.getMaxYMetres() - xy.getMinYMetres())};
-
-        // y gridlines
-        for (int y{xy.getMinYMetres()}; y < xy.getMaxYMetres(); ++y) {
-            g.drawHorizontalLine(yZero - y * unit, 0.f, right);
-        }
     }
 
     void WfsLookAndFeel::drawXYControllerNode(juce::Graphics &g, const XYControllerComponent::Node &node, const float intensity) const
@@ -89,45 +55,5 @@ namespace ananas::WFS::UI
         g.drawText(node.getLabel(),
                    node.getLocalBounds(),
                    juce::Justification::centred);
-    }
-
-    void WfsLookAndFeel::drawSpeakerIcon(juce::Graphics &g, const SpeakerIconComponent & s) const
-    {
-        const auto bounds{s.getBounds().toFloat()};
-        const auto speaker{createSpeakerIconPath()};
-
-        const auto targetBounds{
-            juce::Rectangle{
-                0.f, 0.f,
-                bounds.getWidth(),
-                bounds.getHeight() - getSpeakerOutlineThickness()
-            }
-        };
-
-        const juce::RectanglePlacement placement{juce::RectanglePlacement::stretchToFit};
-        const auto transform{
-            placement.getTransformToFit(speaker.getBounds(), targetBounds)
-        };
-
-        g.setColour(s.findColour(SpeakerIconComponent::fillColourId));
-        g.fillPath(speaker, transform);
-
-        g.setColour(s.findColour(SpeakerIconComponent::borderColourId));
-        g.strokePath(speaker, juce::PathStrokeType{getSpeakerOutlineThickness(), juce::PathStrokeType::mitered}, transform);
-    }
-
-    juce::Path WfsLookAndFeel::createSpeakerIconPath() const
-    {
-        juce::Path speaker;
-
-        speaker.startNewSubPath(getSpeakerIconCoilStartX(), getSpeakerIconCoilStartY());
-        speaker.lineTo(getSpeakerIconCoilStartX() + getSpeakerIconCoilWidth(), getSpeakerIconCoilStartY());
-        speaker.lineTo(getSpeakerIconCoilStartX() + getSpeakerIconCoilWidth(), getSpeakerIconCoilHeight());
-        speaker.lineTo(getSpeakerIconConeRightX(), getSpeakerIconConeEndY());
-        speaker.lineTo(getSpeakerIconConeLeftX(), getSpeakerIconConeEndY());
-        speaker.lineTo(getSpeakerIconCoilStartX(), getSpeakerIconCoilHeight());
-        speaker.closeSubPath();
-
-        return speaker;
     }
 }

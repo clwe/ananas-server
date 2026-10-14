@@ -21,6 +21,9 @@ namespace ananas::WFS::UI
 
         // Severity::warning, as an int (see LayoutProblem).
         constexpr int WarningSeverity = 1;
+
+        constexpr float MinZoom = .05f;
+        constexpr float MaxZoom = 20.f;
     }
 
     LayoutView::LayoutView()
@@ -52,6 +55,20 @@ namespace ananas::WFS::UI
         extraArea = area;
         updateTransform();
         repaint();
+    }
+
+    void LayoutView::setZoom(const float factor)
+    {
+        const auto clamped = juce::jlimit(MinZoom, MaxZoom, factor);
+        if (juce::exactlyEqual(clamped, zoom)) return;
+        zoom = clamped;
+        updateTransform();
+        repaint();
+    }
+
+    float LayoutView::getZoom() const
+    {
+        return zoom;
     }
 
     void LayoutView::setSelection(const juce::SparseSet<int> &selection)
@@ -95,10 +112,6 @@ namespace ananas::WFS::UI
         };
         for (const auto &s: speakers) include(s.position);
         if (listener) include(*listener);
-        if (extraArea) {
-            include(extraArea->getTopLeft());
-            include(extraArea->getBottomRight());
-        }
 
         auto bounds = juce::Rectangle<float>{minimum, maximum}.expanded(MarginMetres);
         bounds = bounds.withSizeKeepingCentre(juce::jmax(bounds.getWidth(), MinExtentMetres),
@@ -108,11 +121,16 @@ namespace ananas::WFS::UI
         if (area.isEmpty()) return;
 
         // The same scale on both axes: whichever direction is tighter.
-        scale = juce::jmin(area.getWidth() / bounds.getWidth(), area.getHeight() / bounds.getHeight());
+        const auto newScale = zoom * juce::jmin(area.getWidth() / bounds.getWidth(), area.getHeight() / bounds.getHeight());
 
         // Centre the bounds; y is flipped (+y up).
-        offset = {area.getCentreX() - bounds.getCentreX() * scale,
-                  area.getCentreY() + bounds.getCentreY() * scale};
+        const juce::Point<float> newOffset{area.getCentreX() - bounds.getCentreX() * newScale,
+                                           area.getCentreY() + bounds.getCentreY() * newScale};
+
+        if (juce::exactlyEqual(newScale, scale) && newOffset == offset) return;
+        scale = newScale;
+        offset = newOffset;
+        if (onTransformChanged) onTransformChanged();
     }
 
     juce::Colour LayoutView::getModuleColour(const juce::String &moduleIp) const

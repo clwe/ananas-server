@@ -3,9 +3,17 @@
 
 #include <juce_gui_basics/juce_gui_basics.h>
 #include <juce_audio_processors/juce_audio_processors.h>
+#include "LayoutView.h"
 
 namespace ananas::WFS::UI
 {
+    /**
+     * The sources (and the Ambisonics listener) as draggable nodes over a
+     * top-down view of the speakers, to scale and zoomable. Source positions
+     * are normalised parameters; they're shown and dragged in metres (x
+     * scaled to outerSpeakerX, y to the source y range, as the renderers do).
+     * Nodes outside the zoomed view aren't drawn.
+     */
     class XYControllerComponent final : public juce::Component,
                                         public juce::Timer
     {
@@ -30,16 +38,32 @@ namespace ananas::WFS::UI
 
         void resized() override;
 
-        void calculateGridSpacingX();
-
-        float getSpeakerArrayWidth() const;
-
         /**
-         * @param arrayWidthMetres Width of the speaker array, edge to edge.
+         * @param outerSpeakerXMetres Source x is scaled to this (see
+         * RenderLayout::outerSpeakerX).
          * @param numRenderedSources Sources rendered by every module in the
          * array; nodes for the others are dimmed.
          */
-        void setArrayGeometry(float arrayWidthMetres, int numRenderedSources);
+        void setArrayGeometry(float outerSpeakerXMetres, int numRenderedSources);
+
+        // The speakers drawn underneath the nodes.
+        void setSpeakers(std::vector<LayoutView::ViewSpeaker> speakers);
+
+        // Normalised source / listener position to component coordinates,
+        // and back (clamped to the parameter range).
+        [[nodiscard]] juce::Point<float> valueToView(juce::Point<float> value) const;
+        [[nodiscard]] juce::Point<float> viewToValue(juce::Point<float> view) const;
+
+        // Metres (array frame) to component coordinates.
+        [[nodiscard]] juce::Point<float> metresToView(juce::Point<float> metres) const;
+
+        // Pixels per metre at the current zoom.
+        [[nodiscard]] float getScale() const;
+
+        [[nodiscard]] float getOuterSpeakerX() const;
+
+        // Called when the view's transform changes (size, speakers, zoom).
+        std::function<void()> onViewChanged;
 
         /**
          * Show or hide the Ambisonics listening point.
@@ -48,15 +72,11 @@ namespace ananas::WFS::UI
 
         void mouseDown(const juce::MouseEvent &event) override;
 
+        void mouseWheelMove(const juce::MouseEvent &event, const juce::MouseWheelDetails &wheel) override;
+
         void hideAllNodesBesides(int nodeIdNotToHide);
 
         void timerCallback() override;
-
-        int getGridSpacingX() const;
-
-        int getMaxYMetres() const;
-
-        int getMinYMetres() const;
 
         class Node final : public Component,
                            public juce::AsyncUpdater,
@@ -204,12 +224,18 @@ namespace ananas::WFS::UI
 
         JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(XYControllerComponent)
 
+        void updateNodeBounds();
+
+        void setZoom(float factor);
+
+        // Underneath the nodes; doesn't take mouse clicks.
+        LayoutView layoutView;
         // The sources, then the listener.
         juce::OwnedArray<Node> nodes;
         Node *listenerNode{nullptr};
         juce::OwnedArray<Attachment> attachments;
-        int xGridSpacing{};
-        float speakerArrayWidth{0.f};
+        float outerSpeakerX{1.f};
+        juce::TextButton zoomInButton, zoomOutButton, zoomFitButton;
         juce::HashMap<int, std::atomic<float> *> &nodeIntensities;
     };
 } // ananas::WFS

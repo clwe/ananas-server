@@ -3,7 +3,6 @@
 
 #include <juce_gui_basics/juce_gui_basics.h>
 #include "ModuleComponent.h"
-#include "SpeakerIconComponent.h"
 #include "XYControllerComponent.h"
 #include "../LinearArray.h"
 #if SHOW_NO_NETWORK_OVERLAY
@@ -40,6 +39,12 @@ namespace ananas::WFS::UI
 
         void updateArrayLayout(const juce::var &var);
 
+        // The speakers for the XY view, from speakerLayoutNode.
+        void updateSpeakers();
+
+        // Each slot selector above its slot's speakers, at the view's zoom.
+        void layoutModuleSelectors();
+
         void valueTreePropertyChanged(juce::ValueTree &treeWhosePropertyHasChanged, const juce::Identifier &property) override;
 
         void parameterChanged(const juce::String &parameterID, float newValue) override;
@@ -56,7 +61,6 @@ namespace ananas::WFS::UI
         juce::AudioProcessorValueTreeState &state;
         XYControllerComponent xyController;
         juce::OwnedArray<ModuleComponent> modules;
-        juce::OwnedArray<SpeakerIconComponent> speakerIcons;
         juce::ComboBox numModulesSelector;
         juce::Label numModulesLabel;
         juce::ToggleButton showModuleSelectorsButton;
@@ -72,6 +76,10 @@ namespace ananas::WFS::UI
         juce::ValueTree modulesNode;
         // The linear-array setup (module per slot), mirrored by the processor.
         juce::ValueTree linearArrayNode;
+        // The speakers in use (from the processor), drawn in the XY view;
+        // their x positions place the slot selectors in linear-array mode.
+        juce::ValueTree speakerLayoutNode;
+        std::vector<float> speakerXs;
         ModuleComponent::SelectionCallback onModuleSelected;
         // Number of speakers in each module slot.
         std::vector<int> slotNumSpeakers;

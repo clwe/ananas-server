@@ -72,8 +72,14 @@ Positions stay on the server; the firmware never stores or hardcodes them.
         speaker off y = 0). With the custom layout, position, module and
         output are edited in the table, and speakers added and removed;
         "Copy linear array to custom" starts it from the linear array.
-      - Still open: the top-down view; the checks for speakers facing away
-        and for the listener or sources. (z and orientation are done.)
+      - Done: **top-down view** (`LayoutView`), to scale with the same
+        scale on both axes: in the Speakers tab next to the table (shared
+        selection), and in the WFS tab as the XY view's background, with
+        the sources over it in metres, zoom buttons and mouse wheel, and
+        the slot selectors above their slots' speakers. Sources outside the
+        zoomed view aren't drawn.
+      - Still open: the checks for speakers facing away and for the
+        listener or sources. (z and orientation are done.)
       - **Dragging in the top-down view** (later, after the view itself): in
         custom mode, drag speakers to move them, and rotate their facing
         direction (e.g. with a modifier key).

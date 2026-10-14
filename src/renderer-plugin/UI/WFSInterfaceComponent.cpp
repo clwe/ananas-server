@@ -104,6 +104,11 @@ namespace ananas::WFS::UI
         // get the modules node
         modulesNode = persistentTree.getChildWithName(ananas::Utils::Identifiers::ModulesParamID);
         linearArrayNode = persistentTree.getChildWithName(Identifiers::LinearArrayTreeType);
+        speakerLayoutNode = dynamicTree.getChildWithName(Identifiers::SpeakerLayoutTreeType);
+
+        // The view's zoom moves the speakers, and the slot selectors with them.
+        xyController.onViewChanged = [this] { layoutModuleSelectors(); };
+        updateSpeakers();
 
         // and set up the modules.
         updateArrayLayout(dynamicTree[Identifiers::ArrayLayoutParamID]);
@@ -148,35 +153,7 @@ namespace ananas::WFS::UI
         bounds = bounds.reduced(10);
         xyController.setBounds(bounds);
 
-        const auto yZero{Constants::MaxYMetres * bounds.getHeight() / (Constants::MaxYMetres - Constants::MinYMetres)};
-        bounds.removeFromTop(yZero - Dimensions::ModuleSelectorHeight - Dimensions::SpeakerIconHeight);
-
-        juce::FlexBox moduleFlex;
-        moduleFlex.flexDirection = juce::FlexBox::Direction::row;
-
-        for (int n{0}; n < modules.size(); ++n) {
-            // Width in proportion to the number of speakers in the slot.
-            const auto numSpeakers{static_cast<size_t>(n) < slotNumSpeakers.size() ? slotNumSpeakers[static_cast<size_t>(n)] : 1};
-            moduleFlex.items.add(juce::FlexItem(*modules[n])
-                .withFlex(static_cast<float>(numSpeakers))
-                .withMaxHeight(Dimensions::ModuleSelectorHeight));
-        }
-
-        moduleFlex.performLayout(bounds);
-
-        bounds.removeFromTop(Dimensions::ModuleSelectorHeight);
-
-        juce::FlexBox speakerFlex;
-        // Speaker icons
-        speakerFlex.flexDirection = juce::FlexBox::Direction::row;
-        speakerFlex.justifyContent = juce::FlexBox::JustifyContent::center;
-        for (const auto &s: speakerIcons) {
-            speakerFlex.items.add(juce::FlexItem{*s}
-                .withFlex(1.f)
-                .withHeight(Dimensions::SpeakerIconHeight));
-        }
-
-        speakerFlex.performLayout(bounds);
+        layoutModuleSelectors();
 
 #if SHOW_NO_NETWORK_OVERLAY
         OverlayableComponent::resized();
@@ -234,7 +211,6 @@ namespace ananas::WFS::UI
         }
 
         const auto numSlots{static_cast<int>(slotNumSpeakers.size())};
-        const auto totalNumSpeakers{std::accumulate(slotNumSpeakers.begin(), slotNumSpeakers.end(), 0)};
 
         // Module selectors, one per slot.
         if (modules.size() != numSlots) {
@@ -249,20 +225,12 @@ namespace ananas::WFS::UI
             updateModuleLists();
         }
 
-        // Speaker icons, one per speaker.
-        if (speakerIcons.size() != totalNumSpeakers) {
-            speakerIcons.clear();
-            for (int n{0}; n < totalNumSpeakers; ++n) {
-                const auto s{speakerIcons.add(new SpeakerIconComponent)};
-                addAndMakeVisible(s, -1);
-            }
-        }
-
         const int numRenderedSources{layout->getProperty(Identifiers::ArrayNumRenderedSourcesPropertyID)};
         const int numLimitingModules{layout->getProperty(Identifiers::ArrayNumLimitingModulesPropertyID)};
         const float outerSpeakerX{layout->getProperty(Identifiers::ArrayOuterSpeakerXPropertyID)};
 
-        xyController.setArrayGeometry(layout->getProperty(Identifiers::ArrayWidthPropertyID), numRenderedSources);
+        xyController.setArrayGeometry(outerSpeakerX, numRenderedSources);
+        layoutModuleSelectors();
 
         juce::StringArray warnings;
 
@@ -299,6 +267,9 @@ namespace ananas::WFS::UI
         } else if (property == Identifiers::ArrayLayoutParamID) {
             updateArrayLayout(treeWhosePropertyHasChanged[property]);
         }
+        if (treeWhosePropertyHasChanged.hasType(Identifiers::SpeakerTreeType)) {
+            updateSpeakers();
+        }
         if (treeWhosePropertyHasChanged == linearArrayNode) {
             if (property == Identifiers::LinearArrayNumSlotsPropertyID) {
                 numModulesSelector.setSelectedId(treeWhosePropertyHasChanged[property], juce::dontSendNotification);
@@ -312,6 +283,8 @@ namespace ananas::WFS::UI
     {
         if (parentTree == modulesNode || parentTree == linearArrayNode) {
             updateModuleLists();
+        } else if (parentTree == speakerLayoutNode) {
+            updateSpeakers();
         }
     }
 
@@ -319,6 +292,8 @@ namespace ananas::WFS::UI
     {
         if (parentTree == modulesNode || parentTree == linearArrayNode) {
             updateModuleLists();
+        } else if (parentTree == speakerLayoutNode) {
+            updateSpeakers();
         }
     }
 
@@ -332,6 +307,68 @@ namespace ananas::WFS::UI
         }
 
         resized();
+    }
+
+    void WFSInterfaceComponent::updateSpeakers()
+    {
+        std::vector<LayoutView::ViewSpeaker> speakers;
+        speakerXs.clear();
+
+        for (const auto &speaker: speakerLayoutNode) {
+            if (!speaker.hasType(Identifiers::SpeakerTreeType)) continue;
+
+            LayoutView::ViewSpeaker s;
+            s.index = speaker[Identifiers::SpeakerIndexPropertyID];
+            s.position = {speaker[Identifiers::SpeakerXPropertyID], speaker[Identifiers::SpeakerYPropertyID]};
+            s.z = speaker[Identifiers::SpeakerZPropertyID];
+            s.facing = Direction{speaker[Identifiers::SpeakerFacingXPropertyID],
+                                 speaker[Identifiers::SpeakerFacingYPropertyID],
+                                 speaker[Identifiers::SpeakerFacingZPropertyID]}.normalised();
+            s.moduleIp = speaker[Identifiers::SpeakerModuleIpPropertyID].toString();
+            s.severity = speaker[Identifiers::SpeakerSeverityPropertyID];
+
+            speakerXs.push_back(s.position.x);
+            speakers.push_back(std::move(s));
+        }
+
+        xyController.setSpeakers(std::move(speakers));
+        layoutModuleSelectors();
+    }
+
+    void WFSInterfaceComponent::layoutModuleSelectors()
+    {
+        if (modules.isEmpty()) return;
+
+        // In a linear array the speakers come slot by slot, left to right; each
+        // selector spans its slot's speakers, half a spacing either side,
+        // just above the array line.
+        const auto spacing{static_cast<float>(linearArrayNode.getProperty(Identifiers::LinearArraySpeakerSpacingPropertyID,
+                                                                          Constants::DefaultSpeakerSpacingMetres))};
+        const auto origin{xyController.getPosition().toFloat()};
+        const auto lineY{origin.y + xyController.metresToView({0.f, 0.f}).y};
+        // Clear of the speaker symbols on the line.
+        const auto top{lineY - static_cast<float>(Dimensions::ModuleSelectorHeight) - 12.f};
+
+        size_t first{0};
+        for (int n{0}; n < modules.size(); ++n) {
+            const auto count{static_cast<size_t>(n) < slotNumSpeakers.size()
+                                 ? static_cast<size_t>(juce::jmax(slotNumSpeakers[static_cast<size_t>(n)], 0))
+                                 : size_t{0}};
+
+            if (count == 0 || first + count > speakerXs.size()) {
+                // Not (yet) matching the speakers, e.g. while switching layouts.
+                modules[n]->setBounds({});
+                first += count;
+                continue;
+            }
+
+            const auto left{origin.x + xyController.metresToView({speakerXs[first] - spacing / 2.f, 0.f}).x};
+            const auto right{origin.x + xyController.metresToView({speakerXs[first + count - 1] + spacing / 2.f, 0.f}).x};
+            modules[n]->setBounds(juce::Rectangle<float>{left, top, right - left,
+                                                         static_cast<float>(Dimensions::ModuleSelectorHeight)}
+                                  .toNearestInt());
+            first += count;
+        }
     }
 
     void WFSInterfaceComponent::expandModuleList(const int moduleID)

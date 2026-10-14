@@ -11,7 +11,28 @@ namespace ananas::WFS::UI
         juce::HashMap<int, std::atomic<float> *> &sourceAmplitudes
     ) : nodeIntensities(sourceAmplitudes)
     {
-        calculateGridSpacingX();
+        // The speakers underneath; clicks go to this component (for the
+        // menu) and to the nodes.
+        addAndMakeVisible(layoutView);
+        layoutView.setInterceptsMouseClicks(false, false);
+        layoutView.onTransformChanged = [this]
+        {
+            updateNodeBounds();
+            if (onViewChanged) onViewChanged();
+        };
+
+        zoomInButton.setButtonText("+");
+        zoomInButton.setTooltip("Zoom in (or use the mouse wheel)");
+        zoomInButton.onClick = [this] { setZoom(layoutView.getZoom() * 1.5f); };
+        zoomOutButton.setButtonText("-");
+        zoomOutButton.setTooltip("Zoom out (or use the mouse wheel)");
+        zoomOutButton.onClick = [this] { setZoom(layoutView.getZoom() / 1.5f); };
+        zoomFitButton.setButtonText("Fit");
+        zoomFitButton.setTooltip("Fit the speakers");
+        zoomFitButton.onClick = [this] { setZoom(1.f); };
+        for (auto *b: {&zoomInButton, &zoomOutButton, &zoomFitButton}) {
+            addAndMakeVisible(b);
+        }
 
         for (int n{0}; n < numNodesToCreate; ++n) {
             // Add a node for each sound source
@@ -44,45 +65,94 @@ namespace ananas::WFS::UI
 
     void XYControllerComponent::paint(juce::Graphics &g)
     {
-        if (auto *lnf{dynamic_cast<WfsLookAndFeel *>(&getLookAndFeel())})
-            lnf->drawXYController(g, *this);
+        // The layout view fills the component.
+        juce::ignoreUnused(g);
     }
 
     void XYControllerComponent::resized()
     {
+        layoutView.setBounds(getLocalBounds());
+
+        auto buttons = getLocalBounds().reduced(6).removeFromTop(24).removeFromRight(3 * 34);
+        zoomOutButton.setBounds(buttons.removeFromLeft(30));
+        buttons.removeFromLeft(2);
+        zoomInButton.setBounds(buttons.removeFromLeft(30));
+        buttons.removeFromLeft(2);
+        zoomFitButton.setBounds(buttons);
+
+        updateNodeBounds();
+    }
+
+    void XYControllerComponent::updateNodeBounds()
+    {
         for (const auto &node: nodes) {
             node->setBounds();
         }
-
-        calculateGridSpacingX();
     }
 
-    void XYControllerComponent::calculateGridSpacingX()
+    void XYControllerComponent::setZoom(const float factor)
     {
-        // x grid spacing is half the width of the XY controller divided by
-        // speaker spacing times the number of modules (i.e. half the number of
-        // speakers).
-        const auto halfArrayWidth{getSpeakerArrayWidth() / 2};
-        const auto halfXYWidth{getWidth() / 2};
-        xGridSpacing = halfArrayWidth > 0.f ? static_cast<int>(static_cast<float>(halfXYWidth) / halfArrayWidth) : 0;
+        layoutView.setZoom(factor);
     }
 
-    float XYControllerComponent::getSpeakerArrayWidth() const
+    void XYControllerComponent::setArrayGeometry(const float outerSpeakerXMetres, const int numRenderedSources)
     {
-        return speakerArrayWidth;
-    }
+        outerSpeakerX = outerSpeakerXMetres;
 
-    void XYControllerComponent::setArrayGeometry(const float arrayWidthMetres, const int numRenderedSources)
-    {
-        speakerArrayWidth = arrayWidthMetres;
-        calculateGridSpacingX();
+        // Where sources can be: x scaled to the outer speakers, y to its range.
+        layoutView.setExtraArea(juce::Rectangle<float>{
+            juce::Point<float>{-outerSpeakerX, static_cast<float>(Constants::MinYMetres)},
+            juce::Point<float>{outerSpeakerX, static_cast<float>(Constants::MaxYMetres)}
+        });
 
         for (const auto &node: nodes) {
             node->setDimmed(node->getIndex() >= numRenderedSources);
             node->updateTooltip();
         }
 
+        updateNodeBounds();
         repaint();
+    }
+
+    void XYControllerComponent::setSpeakers(std::vector<LayoutView::ViewSpeaker> speakers)
+    {
+        layoutView.setSpeakers(std::move(speakers));
+    }
+
+    juce::Point<float> XYControllerComponent::metresToView(const juce::Point<float> metres) const
+    {
+        return layoutView.toView(metres);
+    }
+
+    juce::Point<float> XYControllerComponent::valueToView(const juce::Point<float> value) const
+    {
+        return metresToView({Params::positionXToMetres(value.x, outerSpeakerX), Params::positionYToMetres(value.y)});
+    }
+
+    juce::Point<float> XYControllerComponent::viewToValue(const juce::Point<float> view) const
+    {
+        const auto metres = layoutView.toMetres(view);
+        const auto x = outerSpeakerX > 0.f ? metres.x / outerSpeakerX : 0.f;
+        const auto y = metres.y < 0.f ? metres.y / -static_cast<float>(Constants::MinYMetres)
+                                      : metres.y / static_cast<float>(Constants::MaxYMetres);
+        const auto &range = Params::VirtualSourcePositionRange;
+        return {juce::jlimit(range.start, range.end, x), juce::jlimit(range.start, range.end, y)};
+    }
+
+    float XYControllerComponent::getScale() const
+    {
+        return layoutView.getScale();
+    }
+
+    float XYControllerComponent::getOuterSpeakerX() const
+    {
+        return outerSpeakerX;
+    }
+
+    void XYControllerComponent::mouseWheelMove(const juce::MouseEvent &event, const juce::MouseWheelDetails &wheel)
+    {
+        juce::ignoreUnused(event);
+        setZoom(layoutView.getZoom() * std::pow(1.5f, wheel.deltaY * 4.f));
     }
 
     void XYControllerComponent::mouseDown(const juce::MouseEvent &event)
@@ -148,20 +218,6 @@ namespace ananas::WFS::UI
         }
     }
 
-    int XYControllerComponent::getGridSpacingX() const
-    {
-        return xGridSpacing;
-    }
-
-    int XYControllerComponent::getMaxYMetres() const
-    {
-        return Constants::MaxYMetres;
-    }
-
-    int XYControllerComponent::getMinYMetres() const
-    {
-        return Constants::MinYMetres;
-    }
 
     //==========================================================================
 
@@ -225,44 +281,12 @@ namespace ananas::WFS::UI
     {
         if (!event.mods.isLeftButtonDown()) return;
 
-        const auto parent{getParentComponent()};
-        const auto parentBounds{parent->getBounds().toFloat()};
-        const auto origin{
-            juce::Point{
-                parentBounds.getWidth() / 2,
-                Constants::MaxYMetres * parentBounds.getHeight() /
-                (Constants::MaxYMetres - Constants::MinYMetres)
-            }
-        };
-        auto mousePos{event.getEventRelativeTo(parent).position};
+        const auto *xy{dynamic_cast<XYControllerComponent *>(getParentComponent())};
+        if (xy == nullptr) return;
 
-        mousePos -= origin;
-
-        auto newVal{mousePos};
-
-        // Normalise x to [-1, 1]
-        newVal.x /= (parentBounds.getWidth() / 2.f);
-
-        // Normalize y to [-1, 1]
-        if (mousePos.y <= 0) {
-            // Above zero: map [-yZero, 0] to [1, 0]
-            newVal.y = -mousePos.y / origin.y;
-        } else {
-            // Below zero: map [0, height-yZero] to [0, -1]
-            newVal.y = -mousePos.y / (parentBounds.getHeight() - origin.y);
-        }
-
-        // Set node value.
-        setValueX(juce::jlimit(
-                      Params::VirtualSourcePositionRange.start,
-                      Params::VirtualSourcePositionRange.end,
-                      newVal.x),
-                  juce::sendNotificationSync);
-        setValueY(juce::jlimit(
-                      Params::VirtualSourcePositionRange.start,
-                      Params::VirtualSourcePositionRange.end,
-                      newVal.y),
-                  juce::sendNotificationSync);
+        const auto newVal{xy->viewToValue(event.getEventRelativeTo(getParentComponent()).position)};
+        setValueX(newVal.x, juce::sendNotificationSync);
+        setValueY(newVal.y, juce::sendNotificationSync);
 
         setBounds();
     }
@@ -290,23 +314,13 @@ namespace ananas::WFS::UI
 
     void XYControllerComponent::Node::setBounds()
     {
-        const auto parentBounds{getParentComponent()->getBounds().toFloat()};
-        const auto origin{
-            juce::Point{
-                parentBounds.getWidth() / 2,
-                Constants::MaxYMetres * parentBounds.getHeight() /
-                (Constants::MaxYMetres - Constants::MinYMetres)
-            }
-        };
+        const auto *xy{dynamic_cast<XYControllerComponent *>(getParentComponent())};
+        if (xy == nullptr) return;
 
-        const auto x{(value.x + 1.f) * origin.x};
-        auto y{0.f};
-
-        if (value.y >= 0) {
-            y = origin.y - origin.y * value.y;
-        } else {
-            y = origin.y - (parentBounds.getHeight() - origin.y) * value.y;
-        }
+        // Outside the parent, the node simply isn't drawn (children are clipped).
+        const auto centre{xy->valueToView(value)};
+        const auto x{centre.x};
+        const auto y{centre.y};
 
         Component::setBounds(
             static_cast<int>(x - Dimensions::NodeHalfDiameter),
@@ -354,16 +368,17 @@ namespace ananas::WFS::UI
     {
         const XYControllerComponent *xy{dynamic_cast<XYControllerComponent *>(getParentComponent())};
         if (xy == nullptr) return;
-        const auto w{xy->getSpeakerArrayWidth()};
+        // The same conversion as the renderers (x scaled to the outer speakers).
+        const auto outerX{xy->getOuterSpeakerX()};
         setTooltip((isListener() ? juce::String{"Listener "} : juce::String{}) +
                    Utils::normalisedPointToCoordinateMetres(
                        value,
                        juce::Point{
-                           -w / 2,
+                           -outerX,
                            static_cast<float>(Constants::MinYMetres)
                        },
                        juce::Point{
-                           w / 2,
+                           outerX,
                            static_cast<float>(Constants::MaxYMetres)
                        }) +
                    (dimmed ? juce::String{"\nNot rendered by all modules"} : juce::String{}));
