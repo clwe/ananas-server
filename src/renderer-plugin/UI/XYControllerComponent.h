@@ -127,6 +127,11 @@ namespace ananas::WFS::UI
 
             [[nodiscard]] float getHeight() const;
 
+            // Higher sources are drawn bigger (and lower ones smaller), so
+            // their height is visible at a glance: the node's diameter in
+            // pixels.
+            [[nodiscard]] float getDiameter() const;
+
             void setBounds();
 
             void handleAsyncUpdate() override;

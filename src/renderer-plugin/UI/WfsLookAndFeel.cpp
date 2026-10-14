@@ -1,4 +1,5 @@
 #include "WfsLookAndFeel.h"
+#include "../WFSUtils.h"
 
 namespace ananas::WFS::UI
 {
@@ -53,14 +54,16 @@ namespace ananas::WFS::UI
         // listening plane.
         g.setColour(node.findColour(XYControllerComponent::Node::textColourId));
         const auto height{node.getHeight()};
+        // Text scales with the node, which scales with the source's height.
+        const auto fontSize{getNodeIndexFontSize() * bounds.getWidth() / Dimensions::NodeDiameter};
         if (std::abs(height) < .005f) {
-            g.setFont(getNodeIndexFontSize());
+            g.setFont(fontSize);
             g.drawText(node.getLabel(), node.getLocalBounds(), juce::Justification::centred);
         } else {
             auto area{node.getLocalBounds().toFloat().reduced(2.f)};
-            g.setFont(getNodeIndexFontSize() * .8f);
+            g.setFont(fontSize * .8f);
             g.drawText(node.getLabel(), area.removeFromTop(area.getHeight() * .55f), juce::Justification::centredBottom);
-            g.setFont(getNodeIndexFontSize() * .55f);
+            g.setFont(fontSize * .55f);
             g.drawText((height > 0.f ? "+" : "") + juce::String{height, 1}, area, juce::Justification::centredTop);
         }
     }

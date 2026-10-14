@@ -333,8 +333,19 @@ namespace ananas::WFS::UI
     {
         if (juce::exactlyEqual(newHeight, height)) return;
         height = newHeight;
+        // The size depends on the height.
+        setBounds();
         repaint();
         triggerChangeMessage(notification);
+    }
+
+    float XYControllerComponent::Node::getDiameter() const
+    {
+        // 15 % bigger per metre above the listening plane, smaller below it;
+        // within limits, so a node stays clickable and doesn't cover the view.
+        constexpr float growthPerMetre{.15f};
+        const auto factor{juce::jlimit(.6f, 2.f, 1.f + growthPerMetre * height)};
+        return Dimensions::NodeDiameter * factor;
     }
 
     float XYControllerComponent::Node::getHeight() const
@@ -352,12 +363,8 @@ namespace ananas::WFS::UI
         const auto x{centre.x};
         const auto y{centre.y};
 
-        Component::setBounds(
-            static_cast<int>(x - Dimensions::NodeHalfDiameter),
-            static_cast<int>(y - Dimensions::NodeHalfDiameter),
-            Dimensions::NodeDiameter,
-            Dimensions::NodeDiameter
-        );
+        const auto diameter{getDiameter()};
+        Component::setBounds(juce::Rectangle<float>{diameter, diameter}.withCentre({x, y}).toNearestInt());
     }
 
     void XYControllerComponent::Node::handleAsyncUpdate()
