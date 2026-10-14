@@ -83,6 +83,12 @@ Positions stay on the server; the firmware never stores or hardcodes them.
       - **Dragging in the top-down view** (later, after the view itself): in
         custom mode, drag speakers to move them, and rotate their facing
         direction (e.g. with a modifier key).
+      - **Look-and-feel colours for the top-down view.** `LayoutView` draws
+        speakers in their module's colour with a darker outline, and its
+        grid and background, with hard-coded colours; the old
+        `SpeakerIconComponent` took its colours from `WfsLookAndFeel`. Give
+        `LayoutView` colour IDs set by the look-and-feel, like the rest of
+        the UI. Not urgent.
       - Done: **bulk assignment.** "Assign to module..." gives the
         selected speakers, in table order, outputs 0, 1, 2... of a module
         (what a slot does in the linear array); "No module" clears them.
