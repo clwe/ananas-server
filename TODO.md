@@ -72,8 +72,11 @@ Positions stay on the server; the firmware never stores or hardcodes them.
         speaker off y = 0). With the custom layout, position, module and
         output are edited in the table, and speakers added and removed;
         "Copy linear array to custom" starts it from the linear array.
-      - Still open: z and orientation; the top-down view; the checks for
-        speakers facing away and for the listener or sources.
+      - Still open: the top-down view; the checks for speakers facing away
+        and for the listener or sources. (z and orientation are done.)
+      - **Dragging in the top-down view** (later, after the view itself): in
+        custom mode, drag speakers to move them, and rotate their facing
+        direction (e.g. with a modifier key).
       - Done: **bulk assignment.** "Assign to module..." gives the
         selected speakers, in table order, outputs 0, 1, 2... of a module
         (what a slot does in the linear array); "No module" clears them.
