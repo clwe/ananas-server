@@ -61,6 +61,9 @@ namespace ananas::WFS::UI
         // Pixels per metre at the current size.
         [[nodiscard]] float getScale() const;
 
+        // Speaker icons are to scale, within limits: their size in pixels.
+        [[nodiscard]] float getSpeakerIconSize() const;
+
         void paint(juce::Graphics &g) override;
 
         void resized() override;

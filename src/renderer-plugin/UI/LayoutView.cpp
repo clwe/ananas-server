@@ -8,11 +8,15 @@ namespace ananas::WFS::UI
         constexpr float MarginMetres = .75f;
         // Smallest area shown, so a single speaker isn't zoomed in absurdly.
         constexpr float MinExtentMetres = 3.f;
-        // Speaker symbol radius and facing arrow length, in pixels.
-        constexpr float SpeakerRadius = 7.f;
-        constexpr float ArrowLength = 16.f;
-        // A click within this many pixels of a speaker selects it.
-        constexpr float HitRadius = 11.f;
+        // Speaker icons are drawn to scale, this size (their longer side), but
+        // never smaller or larger than these many pixels, so they stay
+        // visible when zoomed out and don't get huge when zoomed in. 15 cm
+        // keeps icons apart in a linear array at 0.2 m spacing.
+        constexpr float SpeakerSizeMetres = .15f;
+        constexpr float MinSpeakerIconPixels = 8.f;
+        constexpr float MaxSpeakerIconPixels = 60.f;
+        // A click this many pixels beyond an icon's radius still selects it.
+        constexpr float HitTolerance = 3.f;
 
         const std::array<juce::Colour, 8> ModuleColours{
             juce::Colour{0xff1f77b4}, juce::Colour{0xff2ca02c}, juce::Colour{0xff9467bd}, juce::Colour{0xff8c564b},
@@ -24,6 +28,42 @@ namespace ananas::WFS::UI
 
         constexpr float MinZoom = .05f;
         constexpr float MaxZoom = 20.f;
+
+        /**
+         * A loudspeaker outline: a narrow coil, and a cone that opens towards
+         * +y (down on screen), in a 100 x 100 box centred on (0, 0).
+         */
+        juce::Path createSpeakerIcon()
+        {
+            juce::Path icon;
+            icon.startNewSubPath(-24.f, -50.f);
+            icon.lineTo(24.f, -50.f);
+            icon.lineTo(24.f, -25.f);
+            icon.lineTo(50.f, 50.f);
+            icon.lineTo(-50.f, 50.f);
+            icon.lineTo(-24.f, -25.f);
+            icon.closeSubPath();
+            return icon;
+        }
+
+        /**
+         * The icon at `centre`, turned so its cone opens the way the speaker
+         * faces (horizontally; straight up or down keeps the default).
+         */
+        juce::AffineTransform speakerIconTransform(const juce::Point<float> centre, const Direction &facing,
+                                                   const float iconSize)
+        {
+            // On screen, y points down: the facing (x, y) is (x, -y) there. The
+            // icon opens towards (0, 1); rotating by a maps that to
+            // (-sin a, cos a).
+            auto angle = 0.f;
+            if (const auto h = facing.horizontalLength(); h > .1f) {
+                angle = std::atan2(-facing.x / h, -facing.y / h);
+            }
+            return juce::AffineTransform::scale(iconSize / 100.f)
+                    .rotated(angle)
+                    .translated(centre);
+        }
     }
 
     LayoutView::LayoutView()
@@ -91,6 +131,11 @@ namespace ananas::WFS::UI
     float LayoutView::getScale() const
     {
         return scale;
+    }
+
+    float LayoutView::getSpeakerIconSize() const
+    {
+        return juce::jlimit(MinSpeakerIconPixels, MaxSpeakerIconPixels, SpeakerSizeMetres * scale);
     }
 
     void LayoutView::resized()
@@ -180,37 +225,37 @@ namespace ananas::WFS::UI
             g.drawText("L", juce::Rectangle<float>{12.f, 12.f}.withCentre(p), juce::Justification::centred);
         }
 
-        // Speakers: a symbol in the module's colour, an arrow for where it
-        // faces (horizontally), its number and, if raised, its height.
+        // Speakers: an icon in the module's colour, turned to where it faces
+        // (the cone opens that way), its number and, if raised, its height.
+        const auto icon = createSpeakerIcon();
+        const auto iconSize = getSpeakerIconSize();
+        const auto radius = iconSize / 2.f;
         for (const auto &s: speakers) {
             const auto p = toView(s.position);
             const auto colour = getModuleColour(s.moduleIp);
-            const auto circle = juce::Rectangle<float>{2.f * SpeakerRadius, 2.f * SpeakerRadius}.withCentre(p);
-
-            if (s.facing.horizontalLength() > .1f) {
-                const auto h = s.facing.horizontalLength();
-                const juce::Point<float> tip{p.x + ArrowLength * s.facing.x / h, p.y - ArrowLength * s.facing.y / h};
-                g.setColour(colour.withAlpha(.8f));
-                g.drawArrow(juce::Line<float>{p, tip}, 1.5f, 6.f, 6.f);
-            }
+            const auto circle = juce::Rectangle<float>{iconSize, iconSize}.withCentre(p);
+            const auto transform = speakerIconTransform(p, s.facing, iconSize);
 
             if (selected.contains(s.index)) {
                 g.setColour(juce::Colours::lightblue);
-                g.fillEllipse(circle.expanded(4.f));
+                g.fillEllipse(circle.expanded(5.f));
             }
 
             g.setColour(colour);
-            g.fillEllipse(circle);
+            g.fillPath(icon, transform);
+            g.setColour(colour.darker(.6f));
+            g.strokePath(icon, juce::PathStrokeType{1.f}, transform);
+
             if (s.severity >= WarningSeverity) {
                 g.setColour(juce::Colours::darkorange);
-                g.drawEllipse(circle.expanded(1.5f), 2.f);
+                g.drawEllipse(circle.expanded(3.f), 2.f);
             }
 
             g.setColour(juce::Colours::black);
             g.setFont(juce::Font{juce::FontOptions{11.f}});
             auto label = juce::String{s.index + 1};
             if (std::abs(s.z) > .01f) label << " (" << (s.z > 0 ? "+" : "") << juce::String{s.z, 1} << " m)";
-            g.drawText(label, juce::Rectangle<float>{p.x + SpeakerRadius + 2.f, p.y - 7.f, 80.f, 14.f},
+            g.drawText(label, juce::Rectangle<float>{p.x + radius + 5.f, p.y - 7.f, 80.f, 14.f},
                        juce::Justification::centredLeft, false);
         }
 
@@ -223,7 +268,7 @@ namespace ananas::WFS::UI
         if (!onSpeakerClicked) return;
 
         auto closest = -1;
-        auto closestDistance = HitRadius;
+        auto closestDistance = getSpeakerIconSize() / 2.f + HitTolerance;
         for (const auto &s: speakers) {
             const auto d = toView(s.position).getDistanceFrom(event.position);
             if (d <= closestDistance) {
