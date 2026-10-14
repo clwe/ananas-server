@@ -69,12 +69,18 @@ namespace ananas::Ambisonics
                 WFS::Params::positionYToMetres(state.getRawParameterValue(WFS::Params::getVirtualSourcePositionParamID(index, WFS::SourcePositionAxis::Y))->load())
             };
 
+            const auto z{state.getRawParameterValue(WFS::Params::getVirtualSourcePositionParamID(index, WFS::SourcePositionAxis::Z))->load()};
+            const auto horizontal{source.getDistanceFrom(listener)};
+
             std::array<float, NumChannels> target{};
-            if (source.getDistanceFrom(listener) < 1e-2f) {
+            if (horizontal < 1e-2f && std::abs(z) < 1e-2f) {
                 // At the listening point: no direction; omnidirectional.
                 target[0] = 1.f;
             } else {
-                computeCoefficients(WFS::Constants::AmbisonicOrder, computeAzimuth(source, listener), 0.f, target.data());
+                computeCoefficients(WFS::Constants::AmbisonicOrder,
+                                    computeAzimuth(source, listener),
+                                    computeElevation(source, z, listener),
+                                    target.data());
             }
 
             // Ramp from the previous block's gains to avoid zipper noise when
@@ -124,6 +130,11 @@ namespace ananas::Ambisonics
     {
         const auto d{source - listener};
         return std::atan2(-d.x, d.y);
+    }
+
+    float AmbisonicsRenderer::computeElevation(const juce::Point<float> source, const float z, const juce::Point<float> listener)
+    {
+        return std::atan2(z, source.getDistanceFrom(listener));
     }
 
     void AmbisonicsRenderer::sendControlMessages(const bool force)

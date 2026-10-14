@@ -45,6 +45,7 @@ namespace ananas::WFS::UI
             attachments.add(new Attachment{
                 Params::getVirtualSourcePositionParamID(index, SourcePositionAxis::X),
                 Params::getVirtualSourcePositionParamID(index, SourcePositionAxis::Y),
+                Params::getVirtualSourcePositionParamID(index, SourcePositionAxis::Z),
                 apvts, *node
             });
         }
@@ -56,7 +57,7 @@ namespace ananas::WFS::UI
         listenerNode->setBroughtToFrontOnMouseClick(true);
         listenerNode->setColour(Node::backgroundColourId, juce::Colours::orange.withAlpha(.6f));
         listenerNode->setColour(Node::borderColourId, juce::Colours::darkorange);
-        attachments.add(new Attachment{Params::ListenerX.id, Params::ListenerY.id, apvts, *listenerNode});
+        attachments.add(new Attachment{Params::ListenerX.id, Params::ListenerY.id, {}, apvts, *listenerNode});
 
         startTimerHz(15);
     }
@@ -267,6 +268,11 @@ namespace ananas::WFS::UI
                 }
             });
         } else {
+            // Alt-drag changes a source's height instead of its position.
+            heightDragStart.reset();
+            if (event.mods.isAltDown() && !isListener()) {
+                heightDragStart = height;
+            }
             currentDrag.reset();
             currentDrag = std::make_unique<ScopedDragNotification>(*this);
         }
@@ -284,6 +290,16 @@ namespace ananas::WFS::UI
         const auto *xy{dynamic_cast<XYControllerComponent *>(getParentComponent())};
         if (xy == nullptr) return;
 
+        if (heightDragStart) {
+            // To scale: dragging up by one metre of the grid raises the source
+            // by one metre.
+            const auto metres{-static_cast<float>(event.getDistanceFromDragStartY()) / juce::jmax(xy->getScale(), 1e-3f)};
+            setHeight(Params::VirtualSourceZRange.snapToLegalValue(*heightDragStart + metres), juce::sendNotificationSync);
+            updateTooltip();
+            repaint();
+            return;
+        }
+
         const auto newVal{xy->viewToValue(event.getEventRelativeTo(getParentComponent()).position)};
         setValueX(newVal.x, juce::sendNotificationSync);
         setValueY(newVal.y, juce::sendNotificationSync);
@@ -294,6 +310,7 @@ namespace ananas::WFS::UI
     void XYControllerComponent::Node::mouseUp(const juce::MouseEvent &event)
     {
         ignoreUnused(event);
+        heightDragStart.reset();
         currentDrag.reset();
         updateTooltip();
     }
@@ -311,6 +328,19 @@ namespace ananas::WFS::UI
         triggerChangeMessage(notification);
     }
 
+
+    void XYControllerComponent::Node::setHeight(const float newHeight, const juce::NotificationType notification)
+    {
+        if (juce::exactlyEqual(newHeight, height)) return;
+        height = newHeight;
+        repaint();
+        triggerChangeMessage(notification);
+    }
+
+    float XYControllerComponent::Node::getHeight() const
+    {
+        return height;
+    }
 
     void XYControllerComponent::Node::setBounds()
     {
@@ -381,6 +411,7 @@ namespace ananas::WFS::UI
                            outerX,
                            static_cast<float>(Constants::MaxYMetres)
                        }) +
+                   (isListener() ? juce::String{} : ", height " + juce::String{height, 2} + " m (Alt-drag to change)") +
                    (dimmed ? juce::String{"\nNot rendered by all modules"} : juce::String{}));
     }
 
@@ -444,6 +475,7 @@ namespace ananas::WFS::UI
     XYControllerComponent::ParameterAttachment::ParameterAttachment(
         const juce::String &paramIdX,
         const juce::String &paramIdY,
+        const juce::String &paramIdZ,
         const juce::AudioProcessorValueTreeState &state,
         Node &n,
         juce::UndoManager *um
@@ -451,9 +483,15 @@ namespace ananas::WFS::UI
         attachmentX(*state.getParameter(paramIdX), [this](const float f) { setValueX(f); }, um),
         attachmentY(*state.getParameter(paramIdY), [this](const float f) { setValueY(f); }, um)
     {
+        if (paramIdZ.isNotEmpty()) {
+            attachmentZ = std::make_unique<juce::ParameterAttachment>(
+                *state.getParameter(paramIdZ), [this](const float f) { setHeight(f); }, um);
+        }
+
         node.addListener(this);
         attachmentX.sendInitialUpdate();
         attachmentY.sendInitialUpdate();
+        if (attachmentZ) attachmentZ->sendInitialUpdate();
         node.updateTooltip();
     }
 
@@ -476,12 +514,20 @@ namespace ananas::WFS::UI
         node.setBounds();
     }
 
+    void XYControllerComponent::ParameterAttachment::setHeight(const float newHeight)
+    {
+        const juce::ScopedValueSetter svs(ignoreCallbacks, true);
+        node.setHeight(newHeight, juce::sendNotificationSync);
+        node.updateTooltip();
+    }
+
     void XYControllerComponent::ParameterAttachment::valueChanged(Node *)
     {
         if (!ignoreCallbacks) {
             const auto val{node.getValue()};
             attachmentX.setValueAsPartOfGesture(val.x);
             attachmentY.setValueAsPartOfGesture(val.y);
+            if (attachmentZ) attachmentZ->setValueAsPartOfGesture(node.getHeight());
         }
     }
 
@@ -489,12 +535,14 @@ namespace ananas::WFS::UI
     {
         attachmentX.beginGesture();
         attachmentY.beginGesture();
+        if (attachmentZ) attachmentZ->beginGesture();
     }
 
     void XYControllerComponent::ParameterAttachment::dragEnded(Node *)
     {
         attachmentX.endGesture();
         attachmentY.endGesture();
+        if (attachmentZ) attachmentZ->endGesture();
     }
 
     //==========================================================================
@@ -502,9 +550,10 @@ namespace ananas::WFS::UI
     XYControllerComponent::Attachment::Attachment(
         const juce::String &paramIdX,
         const juce::String &paramIdY,
+        const juce::String &paramIdZ,
         juce::AudioProcessorValueTreeState &state,
         Node &node
-    ) : attachment(std::make_unique<ParameterAttachment>(paramIdX, paramIdY, state, node, state.undoManager))
+    ) : attachment(std::make_unique<ParameterAttachment>(paramIdX, paramIdY, paramIdZ, state, node, state.undoManager))
     {
     }
 }

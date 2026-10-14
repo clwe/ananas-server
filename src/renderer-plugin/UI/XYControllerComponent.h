@@ -121,6 +121,12 @@ namespace ananas::WFS::UI
 
             void setValueY(float newY, juce::NotificationType notification);
 
+            // Height in metres (sources only); changed by Alt-dragging the
+            // node up and down.
+            void setHeight(float newHeight, juce::NotificationType notification);
+
+            [[nodiscard]] float getHeight() const;
+
             void setBounds();
 
             void handleAsyncUpdate() override;
@@ -175,6 +181,9 @@ namespace ananas::WFS::UI
 
             int index{};
             juce::Point<float> value{};
+            float height{0.f};
+            // While Alt-dragging: the height when the drag started.
+            std::optional<float> heightDragStart;
             juce::ListenerList<Listener> listeners;
             std::unique_ptr<ScopedDragNotification> currentDrag;
             float intensity{-100.f};
@@ -185,8 +194,10 @@ namespace ananas::WFS::UI
         class ParameterAttachment final : Node::Listener
         {
         public:
+            // paramIdZ empty: no height (the listener).
             ParameterAttachment(const juce::String &paramIdX,
                                 const juce::String &paramIdY,
+                                const juce::String &paramIdZ,
                                 const juce::AudioProcessorValueTreeState &state,
                                 Node &n,
                                 juce::UndoManager *um = nullptr);
@@ -198,6 +209,8 @@ namespace ananas::WFS::UI
 
             void setValueY(float newY);
 
+            void setHeight(float newHeight);
+
             void valueChanged(Node *node) override;
 
             void dragStarted(Node *node) override;
@@ -206,6 +219,7 @@ namespace ananas::WFS::UI
 
             Node &node;
             juce::ParameterAttachment attachmentX, attachmentY;
+            std::unique_ptr<juce::ParameterAttachment> attachmentZ;
             bool ignoreCallbacks{false};
         };
 
@@ -214,6 +228,7 @@ namespace ananas::WFS::UI
         public:
             Attachment(const juce::String &paramIdX,
                        const juce::String &paramIdY,
+                       const juce::String &paramIdZ,
                        juce::AudioProcessorValueTreeState &state,
                        Node &node);
 

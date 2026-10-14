@@ -54,6 +54,12 @@ namespace ananas::Ambisonics
          */
         static float computeAzimuth(juce::Point<float> source, juce::Point<float> listener);
 
+        /**
+         * Elevation of a source at height z (metres) as seen from the
+         * listener, who is at height 0, in radians, up positive.
+         */
+        static float computeElevation(juce::Point<float> source, float z, juce::Point<float> listener);
+
     private:
         static constexpr size_t NumChannels{WFS::Constants::NumAmbisonicChannels};
         static constexpr size_t NumSources{WFS::Constants::NumSources};

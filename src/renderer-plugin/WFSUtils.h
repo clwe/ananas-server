@@ -57,7 +57,9 @@ namespace ananas::WFS
     enum class SourcePositionAxis : char
     {
         X = 'x',
-        Y = 'y'
+        Y = 'y',
+        // Height, in metres (not normalised); only Ambisonics uses it.
+        Z = 'z'
     };
 
     class Params
@@ -96,6 +98,10 @@ namespace ananas::WFS
 
         constexpr static float VirtualSourceDefaultX{.5f};
         constexpr static float VirtualSourceDefaultY{.5f};
+        // Source height in metres above the listening plane. WFS is
+        // horizontal and ignores it; Ambisonics encodes it as elevation.
+        inline static const juce::NormalisableRange<float> VirtualSourceZRange{-2.f, 5.f, .001f};
+        constexpr static float VirtualSourceDefaultZ{0.f};
         inline static const juce::NormalisableRange<float> VirtualSourcePositionRange{-1.f, 1.f, 1e-6f};
 
         // The Ambisonics listening point, normalised like the source positions

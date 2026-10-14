@@ -25,6 +25,19 @@ public:
             expectWithinAbsoluteError(AmbisonicsRenderer::computeAzimuth({-1.f, -1.f}, listener), pi / 4.f, 1e-6f);
         }
 
+        beginTest("Elevation: from the source's height and horizontal distance");
+        {
+            const auto pi{juce::MathConstants<float>::pi};
+            // In the listening plane: 0.
+            expectWithinAbsoluteError(AmbisonicsRenderer::computeElevation({0.f, 0.f}, 0.f, listener), 0.f, 1e-6f);
+            // 2 m ahead and 2 m up: 45 degrees.
+            expectWithinAbsoluteError(AmbisonicsRenderer::computeElevation({0.f, 0.f}, 2.f, listener), pi / 4.f, 1e-6f);
+            // Below the listener: negative.
+            expect(AmbisonicsRenderer::computeElevation({0.f, 0.f}, -1.f, listener) < 0.f);
+            // Straight above the listener: 90 degrees.
+            expectWithinAbsoluteError(AmbisonicsRenderer::computeElevation(listener, 3.f, listener), pi / 2.f, 1e-6f);
+        }
+
         beginTest("rmax is the distance to the farthest speaker");
         {
             expectEquals(AmbisonicsRenderer::computeRmax(listener, {}), -1.f);

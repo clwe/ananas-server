@@ -602,6 +602,12 @@ juce::AudioProcessorValueTreeState::ParameterLayout PluginProcessor::createParam
             ananas::WFS::Params::VirtualSourcePositionRange,
             ananas::WFS::Params::VirtualSourceDefaultY
         ));
+        params.add(std::make_unique<juce::AudioParameterFloat>(
+            ananas::WFS::Params::getVirtualSourcePositionParamID(n, ananas::WFS::SourcePositionAxis::Z),
+            ananas::WFS::Params::getVirtualSourcePositionParamName(n, ananas::WFS::SourcePositionAxis::Z),
+            ananas::WFS::Params::VirtualSourceZRange,
+            ananas::WFS::Params::VirtualSourceDefaultZ
+        ));
     }
 
     return params;
