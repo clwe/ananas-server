@@ -92,6 +92,25 @@ namespace ananas::WFS
         apply(std::move(speakers));
     }
 
+    int CustomLayout::assignOutputs(const std::vector<int> &indices, const juce::String &moduleIp, const int numOutputs)
+    {
+        auto speakers = layout.getSpeakers();
+        auto numAssigned = 0;
+
+        for (const auto index: indices) {
+            if (!isValidIndex(index)) continue;
+            if (moduleIp.isNotEmpty() && numAssigned >= numOutputs) break;
+
+            auto &s = speakers[static_cast<size_t>(index)];
+            s.moduleIp = moduleIp;
+            s.output = moduleIp.isEmpty() ? -1 : numAssigned;
+            ++numAssigned;
+        }
+
+        apply(std::move(speakers));
+        return numAssigned;
+    }
+
     juce::ValueTree CustomLayout::toValueTree() const
     {
         juce::ValueTree tree(Identifiers::CustomLayoutTreeType);

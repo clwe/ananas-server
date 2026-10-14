@@ -113,6 +113,10 @@ namespace ananas::WFS::UI
 
         // Runs `replace` right away if the custom layout is empty, otherwise
         // after asking.
+        // Menu of modules; the selected speakers, in table order, get outputs
+        // 0, 1, 2, ... of the chosen one.
+        void showAssignModuleMenu();
+
         void confirmReplacingCustomLayout(const juce::String &message, std::function<void()> replace);
 
         void saveLayout();
@@ -148,6 +152,9 @@ namespace ananas::WFS::UI
         juce::TextButton loadButton;
         juce::TextButton addSpeakerButton;
         juce::TextButton removeSpeakersButton;
+        juce::TextButton assignModuleButton;
+        // The modules offered by assignModuleButton, as of the last update().
+        std::vector<ModuleOption> moduleOptions;
         Table table;
         // Problems that concern a module rather than a speaker.
         juce::Label moduleProblemsLabel;

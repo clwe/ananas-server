@@ -74,10 +74,10 @@ Positions stay on the server; the firmware never stores or hardcodes them.
         "Copy linear array to custom" starts it from the linear array.
       - Still open: z and orientation; the top-down view; the checks for
         speakers facing away and for the listener or sources.
-      - **Bulk assignment:** select several rows, choose a module, and the
-        selected speakers get its outputs 0, 1, 2… in row order (what a
-        slot does in the linear array). Assigning a 16-output module one
-        speaker at a time is tedious.
+      - Done: **bulk assignment.** "Assign to module..." gives the
+        selected speakers, in table order, outputs 0, 1, 2... of a module
+        (what a slot does in the linear array); "No module" clears them.
+        More speakers than outputs: only the first ones are assigned.
 - [x] **The current linear array becomes a generator** ("N modules, spacing
       d") that produces a `SpeakerLayout`, so the WFS workflow stays as it
       is. `/ss` keeps sending each module the positions of its outputs.
@@ -139,6 +139,11 @@ Positions stay on the server; the firmware never stores or hardcodes them.
       spherical formats needs the listener position as reference. None of
       them can express "module IP, output"; that mapping stays
       Ananas-specific.
+      Done: **IEM JSON import** ("Load layout..." recognises it, asks for
+      the radius, or a scale if the file has real radii, and the centre,
+      prefilled with the listener; speakers face the centre, sorted by
+      channel, without modules; imaginary speakers left out). Open: IEM
+      export, EBU ADM YAML (needs a small YAML parser), SSR ASDF.
 - [ ] **Speaker identification:** play noise on one module output at a time,
       to find which physical speaker is wired where. Needs a small firmware
       command for Ambisonics modules, whose stream doesn't address single

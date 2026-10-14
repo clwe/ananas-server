@@ -282,6 +282,7 @@ namespace ananas::WFS::UI
         addAndMakeVisible(loadButton);
         addChildComponent(addSpeakerButton);
         addChildComponent(removeSpeakersButton);
+        addChildComponent(assignModuleButton);
         addAndMakeVisible(table);
         addAndMakeVisible(moduleProblemsLabel);
 
@@ -321,6 +322,11 @@ namespace ananas::WFS::UI
 
         addSpeakerButton.setButtonText("Add speaker");
         addSpeakerButton.onClick = [this] { customLayout.addSpeaker(); };
+
+        assignModuleButton.setButtonText("Assign to module...");
+        assignModuleButton.setTooltip("Assigns a module to the selected speakers: in table order, they get its "
+                                      "outputs 0, 1, 2, ...");
+        assignModuleButton.onClick = [this] { showAssignModuleMenu(); };
 
         removeSpeakersButton.setButtonText("Remove selected");
         removeSpeakersButton.onClick = [this]
@@ -385,6 +391,8 @@ namespace ananas::WFS::UI
             auto buttons = bounds.removeFromBottom(30);
             addSpeakerButton.setBounds(buttons.removeFromLeft(120).reduced(2));
             removeSpeakersButton.setBounds(buttons.removeFromLeft(140).reduced(2));
+            buttons.removeFromLeft(10);
+            assignModuleButton.setBounds(buttons.removeFromLeft(160).reduced(2));
             bounds.removeFromBottom(5);
         }
 
@@ -422,6 +430,7 @@ namespace ananas::WFS::UI
         layoutModeSelector.setSelectedId(isCustom ? CustomItemId : LinearArrayItemId, juce::dontSendNotification);
         addSpeakerButton.setVisible(isCustom);
         removeSpeakersButton.setVisible(isCustom);
+        assignModuleButton.setVisible(isCustom);
 
         std::vector<ModuleOption> modules;
         // All known modules, so a speaker can keep (and be given) a module
@@ -458,12 +467,65 @@ namespace ananas::WFS::UI
             rows.push_back(std::move(row));
         }
 
+        moduleOptions = modules;
         table.setRows(std::move(rows), std::move(modules), isCustom);
 
         const auto moduleProblems = speakerLayoutNode[Identifiers::SpeakerLayoutModuleProblemsPropertyID].toString();
         moduleProblemsLabel.setText(moduleProblems, juce::dontSendNotification);
         moduleProblemsLabel.setTooltip(moduleProblems);
         resized();
+    }
+
+    void SpeakerTableComponent::showAssignModuleMenu()
+    {
+        const auto selected = table.getSelectedRows();
+        if (selected.isEmpty()) {
+            juce::AlertWindow::showAsync(juce::MessageBoxOptions::makeOptionsOk(
+                                             juce::MessageBoxIconType::InfoIcon,
+                                             "Assign to module",
+                                             "Select the speakers first (Shift- or Cmd-click for several)."),
+                                         nullptr);
+            return;
+        }
+
+        // Item IDs: 1 for "no module", module i at i + 2 (0 means cancelled).
+        constexpr int noModuleItemId = 1;
+        juce::PopupMenu menu;
+        menu.addSectionHeader(juce::String{selected.size()} + " speaker" + (selected.size() == 1 ? "" : "s"));
+        for (size_t i = 0; i < moduleOptions.size(); ++i) {
+            const auto &m = moduleOptions[i];
+            menu.addItem(static_cast<int>(i) + 2, m.label + ", " + juce::String{m.numOutputs} + " outputs");
+        }
+        menu.addSeparator();
+        menu.addItem(noModuleItemId, "No module");
+
+        std::vector<int> indices;
+        for (int i = 0; i < selected.size(); ++i) {
+            indices.push_back(selected[i]);
+        }
+
+        menu.showMenuAsync(juce::PopupMenu::Options{}.withTargetComponent(&assignModuleButton),
+                           [safeThis = juce::Component::SafePointer{this}, indices, options = moduleOptions](const int id)
+                           {
+                               if (safeThis == nullptr || id == 0) return;
+
+                               const auto *module = id >= 2 ? &options[static_cast<size_t>(id - 2)] : nullptr;
+                               const auto ip = module != nullptr ? module->ip : juce::String{};
+                               const auto numOutputs = module != nullptr ? module->numOutputs : 0;
+
+                               const auto numAssigned = safeThis->customLayout.assignOutputs(indices, ip, numOutputs);
+
+                               if (module != nullptr && numAssigned < static_cast<int>(indices.size())) {
+                                   juce::AlertWindow::showAsync(juce::MessageBoxOptions::makeOptionsOk(
+                                                                    juce::MessageBoxIconType::InfoIcon,
+                                                                    "Assign to module",
+                                                                    module->label + " has " + juce::String{numOutputs}
+                                                                    + " outputs, so only the first " + juce::String{numAssigned}
+                                                                    + " of the " + juce::String{indices.size()}
+                                                                    + " selected speakers were assigned."),
+                                                                nullptr);
+                               }
+                           });
     }
 
     void SpeakerTableComponent::confirmReplacingCustomLayout(const juce::String &message, std::function<void()> replace)

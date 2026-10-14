@@ -56,6 +56,16 @@ namespace ananas::WFS
         // An empty IP disconnects the speaker from any module.
         void setModule(int index, const juce::String &moduleIp, int output);
 
+        /**
+         * Assigns one module to several speakers at once: the speakers at
+         * `indices`, in that order, get outputs 0, 1, 2, ... of the module (as
+         * a slot does in the linear array), up to `numOutputs`; speakers
+         * beyond that are left as they were. An empty IP disconnects all of
+         * them. One change, one notification.
+         * @return how many speakers got an output (or were disconnected).
+         */
+        int assignOutputs(const std::vector<int> &indices, const juce::String &moduleIp, int numOutputs);
+
         [[nodiscard]] juce::ValueTree toValueTree() const;
 
         // Applies the same rules as the setters; ignores children of other types.

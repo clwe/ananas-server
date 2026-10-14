@@ -229,6 +229,32 @@ public:
             expect(speakersOf(restored) == speakersOf(layout));
         }
 
+        beginTest("Assigning one module to several speakers");
+        {
+            CustomLayout layout;
+            for (int i = 0; i < 5; ++i) layout.addSpeaker();
+            ChangeCounter counter(layout);
+
+            // In the given order, not the speakers' order.
+            expectEquals(layout.assignOutputs({3, 1, 4}, "a", 16), 3);
+            expect(speakersOf(layout)[3].moduleIp == "a" && speakersOf(layout)[3].output == 0);
+            expect(speakersOf(layout)[1].output == 1);
+            expect(speakersOf(layout)[4].output == 2);
+            expect(speakersOf(layout)[0].moduleIp.isEmpty());
+            expectEquals(counter.deliver(), 1);
+
+            // More speakers than outputs: the rest stay as they were.
+            expectEquals(layout.assignOutputs({0, 1, 2}, "stereo", 2), 2);
+            expect(speakersOf(layout)[0].moduleIp == "stereo" && speakersOf(layout)[0].output == 0);
+            expect(speakersOf(layout)[1].moduleIp == "stereo" && speakersOf(layout)[1].output == 1);
+            expect(speakersOf(layout)[2].moduleIp.isEmpty());
+
+            // No module: all of them disconnected; indices out of range ignored.
+            expectEquals(layout.assignOutputs({0, 1, 9}, {}, 0), 2);
+            expect(speakersOf(layout)[0].moduleIp.isEmpty() && speakersOf(layout)[0].output == -1);
+            expect(speakersOf(layout)[1].moduleIp.isEmpty());
+        }
+
         beginTest("Layout mode as saved text; unknown text means the linear array");
         {
             using ananas::WFS::LayoutMode;
