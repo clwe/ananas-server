@@ -217,6 +217,24 @@ Positions stay on the server; the firmware never stores or hardcodes them.
         - Still open: a warning for speakers facing away from the listening
           area.
 
+## WFS
+
+- [ ] **Reference distance for focused sources from the server.** A focused
+      source needs per-speaker delays `(maxHyp - hyp) / c`, so the speaker
+      closest to the focus point fires last. Only the differences between the
+      speakers form the focus; the firmware uses the largest distance
+      *possible* within its position range as the reference (`maxHyp` =
+      28.3 m at ±10 m, `faust/wfs.dsp` in teensy-audiosync), so every focused
+      source carries a common offset of up to ~83 ms (about 67 ms more than
+      with the old ±2.25 m range). The server knows the real layout: send the
+      largest *actual* distance between any WFS speaker and the allowed focus
+      area, e.g. `/wfs/maxhyp` on the WFS control group, the same value for
+      all modules so they stay aligned (like `/ambi/rmax`). In a small lab
+      that's a few metres instead of 28.3 m, so the offset nearly disappears;
+      it also shrinks the delay jump when a source crosses the array line.
+      Needs a firmware change too (use the received value, clamped to
+      `maxHyp`).
+
 ## Ambisonics
 
 - [x] Test with real Ambisonics firmware, once it implements
