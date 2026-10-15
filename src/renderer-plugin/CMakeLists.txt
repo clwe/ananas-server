@@ -47,6 +47,7 @@ target_sources(ananasRenderer
         LayoutFile.cpp
         IemLayout.cpp
         LayoutCheck.cpp
+        SourceArea.cpp
         PluginEditor.cpp
         PluginProcessor.cpp
         Renderers/WfsRenderer.cpp

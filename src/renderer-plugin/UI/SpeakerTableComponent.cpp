@@ -259,12 +259,14 @@ namespace ananas::WFS::UI
     SpeakerTableComponent::SpeakerTableComponent(juce::ValueTree &dynamicTree,
                                                  juce::ValueTree &persistentTree,
                                                  CustomLayout &customLayoutRef,
+                                                 SourceAreaSetup &sourceAreaSetupRef,
                                                  std::function<void(LayoutMode)> onLayoutModeSelectedCallback,
                                                  std::function<void()> onConvertToCustomLayoutCallback,
                                                  std::function<const SpeakerLayout &()> getLayoutToSaveCallback,
                                                  std::function<void(std::vector<Speaker>)> onLayoutLoadedCallback,
                                                  std::function<juce::Point<float>()> getListenerPositionCallback)
         : customLayout(customLayoutRef),
+          sourceAreaSetup(sourceAreaSetupRef),
           onLayoutModeSelected(std::move(onLayoutModeSelectedCallback)),
           onConvertToCustomLayout(std::move(onConvertToCustomLayoutCallback)),
           getLayoutToSave(std::move(getLayoutToSaveCallback)),
@@ -272,7 +274,8 @@ namespace ananas::WFS::UI
           getListenerPosition(std::move(getListenerPositionCallback)),
           speakerLayoutNode(dynamicTree.getChildWithName(Identifiers::SpeakerLayoutTreeType)),
           layoutNode(persistentTree.getChildWithName(Identifiers::LayoutTreeType)),
-          modulesNode(persistentTree.getChildWithName(::ananas::Utils::Identifiers::ModulesParamID))
+          modulesNode(persistentTree.getChildWithName(::ananas::Utils::Identifiers::ModulesParamID)),
+          sourceAreaNode(persistentTree.getChildWithName(Identifiers::SourceAreaTreeType))
     {
         addAndMakeVisible(title);
         addAndMakeVisible(layoutModeLabel);
@@ -356,6 +359,25 @@ namespace ananas::WFS::UI
             customLayout.setModule(index, ip, output);
         };
 
+        sourceAreaXLabel.setText("Source area x (m)", juce::dontSendNotification);
+        sourceAreaXLabel.setJustificationType(juce::Justification::centredRight);
+        sourceAreaYLabel.setText("y (m)", juce::dontSendNotification);
+        sourceAreaYLabel.setJustificationType(juce::Justification::centredRight);
+        const auto areaTooltip = juce::String{"Where sources can be placed, from ... to; source positions map onto "
+                                              "this area for all renderers, so changing it moves the sources with it."};
+        for (auto *label: {&sourceAreaXLabel, &sourceAreaYLabel}) {
+            label->setTooltip(areaTooltip);
+            addAndMakeVisible(label);
+        }
+        for (auto *field: {&sourceAreaXFrom, &sourceAreaXTo, &sourceAreaYFrom, &sourceAreaYTo}) {
+            field->setInputRestrictions(8, "-.0123456789");
+            field->setJustification(juce::Justification::centredRight);
+            field->setTooltip(areaTooltip);
+            field->onReturnKey = [this] { applySourceAreaFields(); };
+            field->onFocusLost = [this] { applySourceAreaFields(); };
+            addAndMakeVisible(field);
+        }
+
         moduleProblemsLabel.setJustificationType(juce::Justification::topLeft);
         moduleProblemsLabel.setColour(juce::Label::textColourId, juce::Colours::darkorange.darker(.3f));
 
@@ -382,6 +404,7 @@ namespace ananas::WFS::UI
         speakerLayoutNode.addListener(this);
         layoutNode.addListener(this);
         modulesNode.addListener(this);
+        sourceAreaNode.addListener(this);
         update();
     }
 
@@ -390,6 +413,7 @@ namespace ananas::WFS::UI
         speakerLayoutNode.removeListener(this);
         layoutNode.removeListener(this);
         modulesNode.removeListener(this);
+        sourceAreaNode.removeListener(this);
         cancelPendingUpdate();
         stopTimer();
     }
@@ -420,10 +444,28 @@ namespace ananas::WFS::UI
 
         moduleProblemsLabel.setBounds(bounds.removeFromBottom(moduleProblemsLabel.getText().isEmpty() ? 0 : 80));
 
-        // The table on the left, the view on the right.
-        layoutView.setBounds(bounds.removeFromRight(juce::roundToInt(static_cast<float>(bounds.getWidth()) * .42f)));
+        // The table on the left, the view (and the source area under it) on
+        // the right.
+        auto right = bounds.removeFromRight(juce::roundToInt(static_cast<float>(bounds.getWidth()) * .42f));
+        auto area = right.removeFromBottom(30);
+        right.removeFromBottom(5);
+        layoutView.setBounds(right);
+        sourceAreaXLabel.setBounds(area.removeFromLeft(120));
+        sourceAreaXFrom.setBounds(area.removeFromLeft(55).reduced(2));
+        sourceAreaXTo.setBounds(area.removeFromLeft(55).reduced(2));
+        sourceAreaYLabel.setBounds(area.removeFromLeft(50));
+        sourceAreaYFrom.setBounds(area.removeFromLeft(55).reduced(2));
+        sourceAreaYTo.setBounds(area.removeFromLeft(55).reduced(2));
         bounds.removeFromRight(10);
         table.setBounds(bounds);
+    }
+
+    void SpeakerTableComponent::applySourceAreaFields()
+    {
+        sourceAreaSetup.setX(sourceAreaXFrom.getText().getFloatValue(), sourceAreaXTo.getText().getFloatValue());
+        sourceAreaSetup.setY(sourceAreaYFrom.getText().getFloatValue(), sourceAreaYTo.getText().getFloatValue());
+        // Show what was applied, also if nothing changed (e.g. invalid text).
+        triggerAsyncUpdate();
     }
 
     void SpeakerTableComponent::timerCallback()
@@ -511,6 +553,16 @@ namespace ananas::WFS::UI
 
         moduleOptions = modules;
         table.setRows(std::move(rows), std::move(modules), isCustom);
+
+        const auto sourceArea = SourceArea{sourceAreaNode[Identifiers::SourceAreaXFromPropertyID],
+                                           sourceAreaNode[Identifiers::SourceAreaXToPropertyID],
+                                           sourceAreaNode[Identifiers::SourceAreaYFromPropertyID],
+                                           sourceAreaNode[Identifiers::SourceAreaYToPropertyID]};
+        layoutView.setExtraArea(sourceArea.getBounds());
+        sourceAreaXFrom.setText(juce::String{sourceArea.xFrom, 2}, juce::dontSendNotification);
+        sourceAreaXTo.setText(juce::String{sourceArea.xTo, 2}, juce::dontSendNotification);
+        sourceAreaYFrom.setText(juce::String{sourceArea.yFrom, 2}, juce::dontSendNotification);
+        sourceAreaYTo.setText(juce::String{sourceArea.yTo, 2}, juce::dontSendNotification);
 
         const auto moduleProblems = speakerLayoutNode[Identifiers::SpeakerLayoutModuleProblemsPropertyID].toString();
         moduleProblemsLabel.setText(moduleProblems, juce::dontSendNotification);

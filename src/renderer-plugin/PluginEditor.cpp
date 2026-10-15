@@ -27,6 +27,7 @@ PluginEditor::PluginEditor(PluginProcessor &p)
           getProcessor().getDynamicTree(),
           getProcessor().getPersistentTree(),
           getProcessor().getCustomLayout(),
+          getProcessor().getSourceAreaSetup(),
           [this](const ananas::WFS::LayoutMode mode)
           {
               getProcessor().setLayoutMode(mode);

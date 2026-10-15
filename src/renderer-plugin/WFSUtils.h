@@ -34,17 +34,14 @@ namespace ananas::WFS
         constexpr static float MinSpeakerSpacingMetres{.05f};
         constexpr static float MaxSpeakerSpacingMetres{.3f};
         constexpr static float DefaultSpeakerSpacingMetres{.2f};
-        // Source y range: from 10 m in front of the array (focused sources)
-        // to 10 m behind it, so a source can be anywhere in a room up to 10 m
-        // deep. Modules on the legacy speaker protocol clamp sources to
-        // -3 ... 10 m themselves.
-        constexpr static int MaxYMetres{10};
-        constexpr static int MinYMetres{-10};
-        // Largest |x| or |y| of a speaker (and |x| of a source) that WFS
-        // modules accept: ±10 m on speaker protocol 1, ±2.25 m before that
-        // (MAX_X in the firmware's faust/wfsParams.lib).
+        // Largest |x| or |y| of a speaker or a source that WFS modules
+        // accept: ±10 m on speaker protocol 1, ±2.25 m before that (MAX_X in
+        // the firmware's faust/wfsParams.lib; those modules clamp source y to
+        // -3 ... 10 m).
         constexpr static float MaxPositionMetres{10.f};
         constexpr static float LegacyMaxPositionMetres{2.25f};
+        // The source area (see SourceArea): each axis at least this long.
+        constexpr static float MinSourceAreaSizeMetres{1.f};
 
         // Speaker positions are resent if a module's announcement doesn't
         // echo what was sent (e.g. after a reboot), at most this often.
@@ -104,24 +101,23 @@ namespace ananas::WFS
         constexpr static float VirtualSourceDefaultZ{0.f};
         inline static const juce::NormalisableRange<float> VirtualSourcePositionRange{-1.f, 1.f, 1e-6f};
 
-        // The Ambisonics listening point, normalised like the source positions
-        // (see positionXToMetres() and positionYToMetres()). Kept in front of
-        // the array, and at least 0.1 m off the speaker line; 2 m in front of
-        // it by default.
+        // The Ambisonics listening point, in metres in the array frame, not
+        // normalised: it stays put when the source area changes (e.g. at the
+        // centre of a speaker dome). 2 m in front of the array by default.
         inline static const RangedParamFloat ListenerX{
             "listenerX",
             "Listener x",
-            {-1.f, 1.f, 1e-6f},
-            {-1., 1., 1e-6},
+            {-Constants::MaxPositionMetres, Constants::MaxPositionMetres, .001f},
+            {-Constants::MaxPositionMetres, Constants::MaxPositionMetres, .001},
             0.f
         };
 
         inline static const RangedParamFloat ListenerY{
             "listenerY",
             "Listener y",
-            {-1.f, -.01f, 1e-6f},
-            {-1., -.01, 1e-6},
-            -.2f
+            {-Constants::MaxPositionMetres, Constants::MaxPositionMetres, .001f},
+            {-Constants::MaxPositionMetres, Constants::MaxPositionMetres, .001},
+            -2.f
         };
 
         struct ChoiceParam : Param
@@ -139,24 +135,6 @@ namespace ananas::WFS
 
         static constexpr int AmbisonicsInputEncode{0};
         static constexpr int AmbisonicsInputPassThrough{1};
-
-        /**
-         * Convert a normalised x-coordinate (source or listener) to metres; the
-         * x-range spans the array, to its outermost speakers.
-         */
-        static float positionXToMetres(const float x, const float outerSpeakerX)
-        {
-            return x * outerSpeakerX;
-        }
-
-        /**
-         * Convert a normalised y-coordinate (source or listener) to metres;
-         * negative values are in front of the array.
-         */
-        static float positionYToMetres(const float y)
-        {
-            return y < 0.f ? y * -static_cast<float>(Constants::MinYMetres) : y * static_cast<float>(Constants::MaxYMetres);
-        }
 
         static juce::String getVirtualSourcePositionParamID(const uint index, SourcePositionAxis axis)
         {
@@ -213,11 +191,16 @@ namespace ananas::WFS
 
         inline static const juce::Identifier ArrayLayoutParamID{"ArrayLayout"};
         inline static const juce::Identifier ArraySlotNumSpeakersPropertyID{"slotNumSpeakers"};
-        inline static const juce::Identifier ArrayWidthPropertyID{"arrayWidth"};
-        inline static const juce::Identifier ArrayOuterSpeakerXPropertyID{"outerSpeakerX"};
         inline static const juce::Identifier ArrayNumRenderedSourcesPropertyID{"numRenderedSources"};
         inline static const juce::Identifier ArrayNumLimitingModulesPropertyID{"numLimitingModules"};
         inline static const juce::Identifier ArrayMaxWfsPositionPropertyID{"maxWfsPosition"};
+        // The source area (see SourceArea), in the array layout for the UI,
+        // and saved with the project.
+        inline static const juce::Identifier SourceAreaTreeType{"SourceArea"};
+        inline static const juce::Identifier SourceAreaXFromPropertyID{"xFrom"};
+        inline static const juce::Identifier SourceAreaXToPropertyID{"xTo"};
+        inline static const juce::Identifier SourceAreaYFromPropertyID{"yFrom"};
+        inline static const juce::Identifier SourceAreaYToPropertyID{"yTo"};
 
         inline static const juce::Identifier LinearArrayTreeType{"LinearArray"};
         inline static const juce::Identifier LinearArrayNumSlotsPropertyID{"numSlots"};
@@ -273,19 +256,6 @@ namespace ananas::WFS
 
         inline static const juce::StringRef ShowSourceHeader{"Show source"};
         inline static const MenuItem ShowAllSources{ShowAllSourcesMenuID, "Show all sources"};
-    };
-
-    class Utils
-    {
-    public:
-        static juce::String normalisedPointToCoordinateMetres(const juce::Point<float> p, const juce::Point<float> min, const juce::Point<float> max)
-        {
-            return "(" +
-                   juce::String{p.x * max.x, 3} +
-                   " m, " +
-                   juce::String{p.y < 0 ? -p.y * min.y : p.y * max.y, 3} +
-                   " m)";
-        }
     };
 
     class Sockets

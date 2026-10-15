@@ -96,15 +96,10 @@ namespace ananas::WFS::UI
         layoutView.setZoom(factor);
     }
 
-    void XYControllerComponent::setArrayGeometry(const float outerSpeakerXMetres, const int numRenderedSources)
+    void XYControllerComponent::setArrayGeometry(const SourceArea &area, const int numRenderedSources)
     {
-        outerSpeakerX = outerSpeakerXMetres;
-
-        // Where sources can be: x scaled to the outer speakers, y to its range.
-        layoutView.setExtraArea(juce::Rectangle<float>{
-            juce::Point<float>{-outerSpeakerX, static_cast<float>(Constants::MinYMetres)},
-            juce::Point<float>{outerSpeakerX, static_cast<float>(Constants::MaxYMetres)}
-        });
+        sourceArea = area;
+        layoutView.setExtraArea(sourceArea.getBounds());
 
         for (const auto &node: nodes) {
             node->setDimmed(node->getIndex() >= numRenderedSources);
@@ -125,29 +120,31 @@ namespace ananas::WFS::UI
         return layoutView.toView(metres);
     }
 
-    juce::Point<float> XYControllerComponent::valueToView(const juce::Point<float> value) const
+    juce::Point<float> XYControllerComponent::valueToMetres(const juce::Point<float> value, const bool isListener) const
     {
-        return metresToView({Params::positionXToMetres(value.x, outerSpeakerX), Params::positionYToMetres(value.y)});
+        return isListener ? value : sourceArea.toMetres(value);
     }
 
-    juce::Point<float> XYControllerComponent::viewToValue(const juce::Point<float> view) const
+    juce::Point<float> XYControllerComponent::metresToValue(const juce::Point<float> metres, const bool isListener) const
     {
-        const auto metres = layoutView.toMetres(view);
-        const auto x = outerSpeakerX > 0.f ? metres.x / outerSpeakerX : 0.f;
-        const auto y = metres.y < 0.f ? metres.y / -static_cast<float>(Constants::MinYMetres)
-                                      : metres.y / static_cast<float>(Constants::MaxYMetres);
-        const auto &range = Params::VirtualSourcePositionRange;
-        return {juce::jlimit(range.start, range.end, x), juce::jlimit(range.start, range.end, y)};
+        if (!isListener) return sourceArea.toNormalised(metres);
+
+        return {Params::ListenerX.range.snapToLegalValue(metres.x), Params::ListenerY.range.snapToLegalValue(metres.y)};
+    }
+
+    juce::Point<float> XYControllerComponent::valueToView(const juce::Point<float> value, const bool isListener) const
+    {
+        return metresToView(valueToMetres(value, isListener));
+    }
+
+    juce::Point<float> XYControllerComponent::viewToValue(const juce::Point<float> view, const bool isListener) const
+    {
+        return metresToValue(layoutView.toMetres(view), isListener);
     }
 
     float XYControllerComponent::getScale() const
     {
         return layoutView.getScale();
-    }
-
-    float XYControllerComponent::getOuterSpeakerX() const
-    {
-        return outerSpeakerX;
     }
 
     void XYControllerComponent::mouseWheelMove(const juce::MouseEvent &event, const juce::MouseWheelDetails &wheel)
@@ -300,7 +297,7 @@ namespace ananas::WFS::UI
             return;
         }
 
-        const auto newVal{xy->viewToValue(event.getEventRelativeTo(getParentComponent()).position)};
+        const auto newVal{xy->viewToValue(event.getEventRelativeTo(getParentComponent()).position, isListener())};
         setValueX(newVal.x, juce::sendNotificationSync);
         setValueY(newVal.y, juce::sendNotificationSync);
 
@@ -359,7 +356,7 @@ namespace ananas::WFS::UI
         if (xy == nullptr) return;
 
         // Outside the parent, the node simply isn't drawn (children are clipped).
-        const auto centre{xy->valueToView(value)};
+        const auto centre{xy->valueToView(value, isListener())};
         const auto x{centre.x};
         const auto y{centre.y};
 
@@ -405,19 +402,10 @@ namespace ananas::WFS::UI
     {
         const XYControllerComponent *xy{dynamic_cast<XYControllerComponent *>(getParentComponent())};
         if (xy == nullptr) return;
-        // The same conversion as the renderers (x scaled to the outer speakers).
-        const auto outerX{xy->getOuterSpeakerX()};
+        // The same conversion as the renderers.
+        const auto metres{xy->valueToMetres(value, isListener())};
         setTooltip((isListener() ? juce::String{"Listener "} : juce::String{}) +
-                   Utils::normalisedPointToCoordinateMetres(
-                       value,
-                       juce::Point{
-                           -outerX,
-                           static_cast<float>(Constants::MinYMetres)
-                       },
-                       juce::Point{
-                           outerX,
-                           static_cast<float>(Constants::MaxYMetres)
-                       }) +
+                   "(" + juce::String{metres.x, 3} + " m, " + juce::String{metres.y, 3} + " m)" +
                    (isListener() ? juce::String{} : ", height " + juce::String{height, 2} + " m (Alt-drag to change)") +
                    (dimmed ? juce::String{"\nNot rendered by all modules"} : juce::String{}));
     }

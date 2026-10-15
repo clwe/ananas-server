@@ -5,6 +5,7 @@
 #include <AnanasNetworkTable.h>
 #include "../CustomLayout.h"
 #include "../LayoutFile.h"
+#include "../SourceArea.h"
 #include "LayoutView.h"
 
 namespace ananas::WFS::UI
@@ -12,10 +13,10 @@ namespace ananas::WFS::UI
     /**
      * Table of the speakers the renderers use, with the problems
      * checkLayout() found, and the choice between the linear array and the
-     * custom layout.
+     * custom layout; and the source area.
      *
      * Shows the processor's SpeakerLayout node in the dynamic tree; reads the
-     * layout mode and the modules from the persistent tree. With the custom
+     * layout mode, the source area and the modules from the persistent tree. With the custom
      * layout, speakers can be edited, added and removed; edits go straight to
      * the CustomLayout, and come back through the trees.
      */
@@ -28,6 +29,7 @@ namespace ananas::WFS::UI
         SpeakerTableComponent(juce::ValueTree &dynamicTree,
                               juce::ValueTree &persistentTree,
                               CustomLayout &customLayout,
+                              SourceAreaSetup &sourceAreaSetup,
                               std::function<void(LayoutMode)> onLayoutModeSelected,
                               std::function<void()> onConvertToCustomLayout,
                               std::function<const SpeakerLayout &()> getLayoutToSave,
@@ -128,6 +130,10 @@ namespace ananas::WFS::UI
         // 0, 1, 2, ... of the chosen one.
         void showAssignModuleMenu();
 
+        // Sets the source area from its four fields; the setup corrects
+        // invalid values, which then come back through the tree.
+        void applySourceAreaFields();
+
         void confirmReplacingCustomLayout(const juce::String &message, std::function<void()> replace);
 
         void saveLayout();
@@ -143,6 +149,7 @@ namespace ananas::WFS::UI
         void applyLoadedLayout(LayoutFile::ReadResult result, const juce::String &fileName);
 
         CustomLayout &customLayout;
+        SourceAreaSetup &sourceAreaSetup;
         std::function<void(LayoutMode)> onLayoutModeSelected;
         std::function<void()> onConvertToCustomLayout;
         std::function<const SpeakerLayout &()> getLayoutToSave;
@@ -154,6 +161,7 @@ namespace ananas::WFS::UI
         juce::ValueTree speakerLayoutNode;
         juce::ValueTree layoutNode;
         juce::ValueTree modulesNode;
+        juce::ValueTree sourceAreaNode;
 
         juce::Label title;
         juce::Label layoutModeLabel;
@@ -170,6 +178,10 @@ namespace ananas::WFS::UI
         LayoutView layoutView;
         // Problems that concern a module rather than a speaker.
         juce::Label moduleProblemsLabel;
+        // Where sources can be: x and y, each from ... to, in metres.
+        juce::Label sourceAreaXLabel;
+        juce::Label sourceAreaYLabel;
+        juce::TextEditor sourceAreaXFrom, sourceAreaXTo, sourceAreaYFrom, sourceAreaYTo;
 
         JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(SpeakerTableComponent)
     };

@@ -35,9 +35,10 @@ namespace ananas::Ambisonics
 
     juce::Point<float> AmbisonicsRenderer::getListenerMetres() const
     {
+        // In metres already.
         return {
-            WFS::Params::positionXToMetres(state.getRawParameterValue(WFS::Params::ListenerX.id)->load(), outerSpeakerX.load()),
-            WFS::Params::positionYToMetres(state.getRawParameterValue(WFS::Params::ListenerY.id)->load())
+            state.getRawParameterValue(WFS::Params::ListenerX.id)->load(),
+            state.getRawParameterValue(WFS::Params::ListenerY.id)->load()
         };
     }
 
@@ -60,14 +61,14 @@ namespace ananas::Ambisonics
         stream.clear();
 
         const auto listener{getListenerMetres()};
-        const auto outerX{outerSpeakerX.load()};
+        const auto area{sourceArea.load()};
 
         for (size_t s{0}; s < NumSources && static_cast<int>(s) < input.getNumChannels(); ++s) {
             const auto index{static_cast<uint>(s)};
-            const juce::Point source{
-                WFS::Params::positionXToMetres(state.getRawParameterValue(WFS::Params::getVirtualSourcePositionParamID(index, WFS::SourcePositionAxis::X))->load(), outerX),
-                WFS::Params::positionYToMetres(state.getRawParameterValue(WFS::Params::getVirtualSourcePositionParamID(index, WFS::SourcePositionAxis::Y))->load())
-            };
+            const auto source{area.toMetres({
+                state.getRawParameterValue(WFS::Params::getVirtualSourcePositionParamID(index, WFS::SourcePositionAxis::X))->load(),
+                state.getRawParameterValue(WFS::Params::getVirtualSourcePositionParamID(index, WFS::SourcePositionAxis::Y))->load()
+            })};
 
             const auto z{state.getRawParameterValue(WFS::Params::getVirtualSourcePositionParamID(index, WFS::SourcePositionAxis::Z))->load()};
             const auto horizontal{source.getDistanceFrom(listener)};
@@ -94,7 +95,7 @@ namespace ananas::Ambisonics
 
     void AmbisonicsRenderer::layoutChanged(const WFS::RenderLayout &layout)
     {
-        outerSpeakerX = layout.outerSpeakerX;
+        sourceArea.store(layout.sourceArea);
         speakerPositions.clear();
         speakerHeights.clear();
         for (const auto &s: layout.getSpeakers(::ananas::Utils::FirmwareType::ambisonicsModule)) {

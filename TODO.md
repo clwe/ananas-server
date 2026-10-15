@@ -49,7 +49,7 @@ Positions stay on the server; the firmware never stores or hardcodes them.
         the processor from `SpeakerLayout` + module list (connection status,
         firmware type, output count) + listener position, whenever any of
         them changes. Holds the positions per connected module for `/ss`,
-        `outerSpeakerX` for WFS source scaling, rmax, the speakers per
+        the source area (set by the processor), rmax, the speakers per
         technique and the WFS source limit. Passed to all renderers via
         `layoutChanged()`, so they all see one consistent state; they only
         copy finished values (e.g. into atomics for the audio thread).
@@ -112,18 +112,19 @@ Positions stay on the server; the firmware never stores or hardcodes them.
         to the modules' output counts. They're edited through their
         parameters; to move single speakers, convert the part to an
         explicit one (otherwise regenerating would overwrite the edits).
-      - Done: `outerSpeakerX`, which both renderers scale source positions
-        to, covers the WFS modules' speakers and speakers without a module
-        (all speakers if there are only Ambisonics modules), so e.g. an
-        Ambisonics ring doesn't widen it.
-        Open: in a *linear array* whose two outer slots both hold
-        Ambisonics modules, this is narrower than the array the XY view
-        draws (slot selectors and speaker icons span the whole array), so
-        a source at the view's edge is drawn above the outer speaker but
-        rendered at the end of the WFS part. Audio is consistent between
-        the renderers; only the view is off. Option: scale to the whole
-        array in linear-array mode (a `compute()` parameter). Decide
-        together with how the XY view changes for 3-D coordinates.
+      - Done (2026-10-15): **source area as a setting**, independent of the
+        speakers (`SourceArea` / `SourceAreaSetup`, step 1 of
+        `docs-and-dev-notes/listener-centred-frame-plan.md`). x and y each
+        from ... to, in metres, default ±5 m, clamped to ±10 m and at least
+        1 m per axis; saved with the project, edited in the Speakers tab
+        (four fields under the top-down view) and drawn in both top-down
+        views. The normalised source parameters map onto it for both
+        renderers and the XY view, so changing it moves the sources with
+        it. Replaces the scaling to `outerSpeakerX` (gone, with its tests)
+        and the y range −10 … +10 m. The listener parameters are in metres
+        now (±10 m, default (0, −2 m)), so the listener stays put when the
+        area changes. The WFS tab warns when the area's x reaches beyond
+        the WFS modules' range (±2.25 m on legacy firmware).
       - The WFS firmware and `VirtualSourceMessenger` assume the array on
         y = 0, facing the listener. Keep WFS parts at their default
         position until speaker orientation (`/ss/<j>/nx|ny`) exists.
@@ -212,9 +213,9 @@ Positions stay on the server; the firmware never stores or hardcodes them.
           ±2.25 m before) in `checkLayout`, and the smallest limit of the
           WFS modules in use (`maxWfsPositionMetres`) for the array warning
           in the WFS tab.
-        - Source y range −10 … +10 m (`Constants::MinYMetres` /
-          `MaxYMetres`); the listener's default stays at 2 m in front of
-          the array.
+        - Source y range −10 … +10 m (since 2026-10-15: the source area,
+          see "A layout made of parts"); the listener's default stays at
+          2 m in front of the array.
         - `tools/fake_module.py --speaker-protocol 1` (outside the repo, in
           `Ananas/tools`) announces protocol 1, prints the bundles it gets
           and echoes the set id, for testing without the firmware.

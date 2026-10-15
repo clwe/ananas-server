@@ -12,6 +12,7 @@
 #include "Renderers/Renderer.h"
 #include "LinearArray.h"
 #include "CustomLayout.h"
+#include "SourceArea.h"
 
 class PluginProcessor final : public juce::AudioProcessor,
                               public juce::ChangeListener,
@@ -87,6 +88,9 @@ public:
     // The custom layout, for the UI to edit.
     [[nodiscard]] ananas::WFS::CustomLayout &getCustomLayout();
 
+    // Where sources can be, for the UI to edit.
+    [[nodiscard]] ananas::WFS::SourceAreaSetup &getSourceAreaSetup();
+
     [[nodiscard]] ananas::WFS::LayoutMode getLayoutMode() const;
 
     // Which layout the renderers use. The other one is kept, so switching
@@ -138,6 +142,8 @@ private:
 
     void updateCustomLayoutTree();
 
+    void updateSourceAreaTree();
+
     // The linear array from the current setup and module list.
     [[nodiscard]] ananas::WFS::LinearArray generateLinearArray() const;
 
@@ -163,6 +169,8 @@ private:
     // The layout mode and the custom layout, mirrored for the UI.
     juce::ValueTree layoutTree;
     juce::ValueTree customLayoutTree;
+    // The source area, mirrored for the UI.
+    juce::ValueTree sourceAreaTree;
 
     ananas::WFS::SecondarySourceMessenger secondarySourceMessenger;
 
@@ -176,6 +184,7 @@ private:
 
     ananas::WFS::LinearArraySetup linearArraySetup;
     ananas::WFS::CustomLayout customLayout;
+    ananas::WFS::SourceAreaSetup sourceAreaSetup;
     ananas::WFS::LayoutMode layoutMode = ananas::WFS::LayoutMode::linearArray;
     // The speakers in use, as of the last updateRenderLayout().
     ananas::WFS::SpeakerLayout speakerLayout;

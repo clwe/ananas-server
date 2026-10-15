@@ -77,7 +77,7 @@ namespace ananas::Ambisonics
         juce::AudioProcessorValueTreeState &state;
         const int passThroughChannelOffset;
         ControlMessenger controlMessenger;
-        std::atomic<float> outerSpeakerX{1.f};
+        WFS::AtomicSourceArea sourceArea;
         // Message thread only.
         std::vector<juce::Point<float>> speakerPositions;
         std::vector<float> speakerHeights;

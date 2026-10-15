@@ -67,8 +67,6 @@ public:
             const auto c{compute({makeModule("a", 0, 2), makeModule("b", 3, 2)}, 8, .2f)};
             expectEquals(c.totalNumSpeakers(), 16);
             expect(approximatelyEqual(c.array.arrayWidth, 3.2f));
-            // Previously: (numModules - .5) * spacing.
-            expect(approximatelyEqual(c.layout.outerSpeakerX, 1.5f));
             expect(approximatelyEqual(c.layout.moduleOutputs.at("a")[0].position.x, -1.5f));
             expect(approximatelyEqual(c.layout.moduleOutputs.at("a")[1].position.x, -1.3f));
             expect(approximatelyEqual(c.layout.moduleOutputs.at("b")[0].position.x, -.3f));
@@ -79,7 +77,6 @@ public:
             const auto c{compute({makeModule("legacy", 0, 2), makeModule("adau", 1, 16, 8)}, 3, .1f)};
             expect(c.array.slotNumSpeakers == std::vector<int>{2, 16, 2});
             expectEquals(c.totalNumSpeakers(), 20);
-            expect(approximatelyEqual(c.layout.outerSpeakerX, .95f));
             const auto &outputs{c.layout.moduleOutputs.at("adau")};
             expectEquals(static_cast<int>(outputs.size()), 16);
             expect(approximatelyEqual(outputs[0].position.x, -.95f + 2 * .1f));
@@ -120,28 +117,6 @@ public:
             return ananas::WFS::RenderLayout::compute(layout, modules);
         };
         const auto ambisonics = ananas::Utils::FirmwareType::ambisonicsModule;
-
-        beginTest("Source scaling: an Ambisonics ring around a WFS array doesn't widen it");
-        {
-            const auto layout = computeCustom({{{-1.f, 0.f}, "wfs", 0}, {{1.f, 0.f}, "wfs", 1},
-                                               {{-3.f, -2.f}, "ambi", 0}, {{3.f, -2.f}, "ambi", 1}},
-                                              {makeModule("wfs", 0, 2).entry, makeModule("ambi", 0, 2, 9, ambisonics).entry});
-            expect(approximatelyEqual(layout.outerSpeakerX, 1.f));
-        }
-
-        beginTest("Source scaling: speakers without a module count as part of the array");
-        {
-            const auto layout = computeCustom({{{-1.f, 0.f}, "wfs", 0}, {{2.f, 0.f}, {}, -1}, {{3.f, -2.f}, "ambi", 0}},
-                                              {makeModule("wfs", 0, 1).entry, makeModule("ambi", 0, 1, 9, ambisonics).entry});
-            expect(approximatelyEqual(layout.outerSpeakerX, 2.f));
-        }
-
-        beginTest("Source scaling: with Ambisonics modules only, all speakers count");
-        {
-            const auto layout = computeCustom({{{-3.f, -2.f}, "ambi", 0}, {{2.5f, -2.f}, "ambi", 1}},
-                                              {makeModule("ambi", 0, 2, 9, ambisonics).entry});
-            expect(approximatelyEqual(layout.outerSpeakerX, 3.f));
-        }
 
         beginTest("Per output: position, height, facing, and whether a speaker uses it");
         {

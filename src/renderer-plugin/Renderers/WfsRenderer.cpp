@@ -47,10 +47,10 @@ namespace ananas::WFS
 
     void WfsRenderer::layoutChanged(const RenderLayout &layout)
     {
-        // Virtual source x-coordinates are scaled to the array's width.
-        if (!juce::approximatelyEqual(layout.outerSpeakerX, outerSpeakerX)) {
-            outerSpeakerX = layout.outerSpeakerX;
-            virtualSourceMessenger.setOuterSpeakerX(outerSpeakerX);
+        // Virtual source positions are mapped onto the source area.
+        if (sourceArea != layout.sourceArea) {
+            sourceArea = layout.sourceArea;
+            virtualSourceMessenger.setSourceArea(*sourceArea);
             resendVirtualSourcePositions();
         }
     }

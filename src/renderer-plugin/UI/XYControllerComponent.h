@@ -4,15 +4,16 @@
 #include <juce_gui_basics/juce_gui_basics.h>
 #include <juce_audio_processors/juce_audio_processors.h>
 #include "LayoutView.h"
+#include "../SourceArea.h"
 
 namespace ananas::WFS::UI
 {
     /**
      * The sources (and the Ambisonics listener) as draggable nodes over a
      * top-down view of the speakers, to scale and zoomable. Source positions
-     * are normalised parameters; they're shown and dragged in metres (x
-     * scaled to outerSpeakerX, y to the source y range, as the renderers do).
-     * Nodes outside the zoomed view aren't drawn.
+     * are normalised parameters; they're shown and dragged in metres, mapped
+     * onto the source area as the renderers do. The listener's parameters are
+     * in metres already. Nodes outside the zoomed view aren't drawn.
      */
     class XYControllerComponent final : public juce::Component,
                                         public juce::Timer
@@ -39,20 +40,24 @@ namespace ananas::WFS::UI
         void resized() override;
 
         /**
-         * @param outerSpeakerXMetres Source x is scaled to this (see
-         * RenderLayout::outerSpeakerX).
+         * @param area Where sources can be (see RenderLayout::sourceArea);
+         * drawn, and source positions are mapped onto it.
          * @param numRenderedSources Sources rendered by every module in the
          * array; nodes for the others are dimmed.
          */
-        void setArrayGeometry(float outerSpeakerXMetres, int numRenderedSources);
+        void setArrayGeometry(const SourceArea &area, int numRenderedSources);
 
         // The speakers drawn underneath the nodes.
         void setSpeakers(std::vector<LayoutView::ViewSpeaker> speakers);
 
-        // Normalised source / listener position to component coordinates,
-        // and back (clamped to the parameter range).
-        [[nodiscard]] juce::Point<float> valueToView(juce::Point<float> value) const;
-        [[nodiscard]] juce::Point<float> viewToValue(juce::Point<float> view) const;
+        // A node's value (normalised for sources, metres for the listener)
+        // to metres, and back (clamped to the parameter range).
+        [[nodiscard]] juce::Point<float> valueToMetres(juce::Point<float> value, bool isListener) const;
+        [[nodiscard]] juce::Point<float> metresToValue(juce::Point<float> metres, bool isListener) const;
+
+        // A node's value to component coordinates, and back.
+        [[nodiscard]] juce::Point<float> valueToView(juce::Point<float> value, bool isListener) const;
+        [[nodiscard]] juce::Point<float> viewToValue(juce::Point<float> view, bool isListener) const;
 
         // Metres (array frame) to component coordinates.
         [[nodiscard]] juce::Point<float> metresToView(juce::Point<float> metres) const;
@@ -60,7 +65,6 @@ namespace ananas::WFS::UI
         // Pixels per metre at the current zoom.
         [[nodiscard]] float getScale() const;
 
-        [[nodiscard]] float getOuterSpeakerX() const;
 
         // Called when the view's transform changes (size, speakers, zoom).
         std::function<void()> onViewChanged;
@@ -254,7 +258,7 @@ namespace ananas::WFS::UI
         juce::OwnedArray<Node> nodes;
         Node *listenerNode{nullptr};
         juce::OwnedArray<Attachment> attachments;
-        float outerSpeakerX{1.f};
+        SourceArea sourceArea;
         juce::TextButton zoomInButton, zoomOutButton, zoomFitButton;
         juce::HashMap<int, std::atomic<float> *> &nodeIntensities;
     };

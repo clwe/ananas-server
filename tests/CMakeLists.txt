@@ -11,6 +11,7 @@ target_sources(ananas_tests
         CustomLayoutTests.cpp
         LayoutFileTests.cpp
         IemLayoutTests.cpp
+        SourceAreaTests.cpp
         ModuleListTests.cpp
         SwitchListTests.cpp
         ValueTreeUtilsTests.cpp
@@ -23,6 +24,7 @@ target_sources(ananas_tests
         ${CMAKE_SOURCE_DIR}/src/renderer-plugin/CustomLayout.cpp
         ${CMAKE_SOURCE_DIR}/src/renderer-plugin/LayoutFile.cpp
         ${CMAKE_SOURCE_DIR}/src/renderer-plugin/IemLayout.cpp
+        ${CMAKE_SOURCE_DIR}/src/renderer-plugin/SourceArea.cpp
         ${CMAKE_SOURCE_DIR}/src/renderer-plugin/Renderers/AmbisonicEncoder.cpp
         ${CMAKE_SOURCE_DIR}/src/renderer-plugin/Renderers/AmbisonicsRenderer.cpp
         ${CMAKE_SOURCE_DIR}/src/renderer-plugin/Renderers/AmbisonicsControlMessenger.cpp

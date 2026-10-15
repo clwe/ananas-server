@@ -5,6 +5,7 @@
 #include <Server.h>
 #include <juce_audio_processors/juce_audio_processors.h>
 #include <juce_osc/juce_osc.h>
+#include "SourceArea.h"
 
 namespace ananas::WFS
 {
@@ -25,10 +26,10 @@ namespace ananas::WFS
         void parameterChanged(const juce::String &parameterID, float newValue) override;
 
         /**
-         * Set the x-coordinate of the array's rightmost speaker; normalised
-         * virtual source x-coordinates are scaled to it.
+         * Set the source area; normalised virtual source positions are
+         * mapped onto it.
          */
-        void setOuterSpeakerX(float x);
+        void setSourceArea(const SourceArea &area);
 
         void timerCallback() override;
 
@@ -46,7 +47,7 @@ namespace ananas::WFS
         juce::uint16 localPort, remotePort;
         bool connected{false};
         std::unordered_map<juce::String, ParamSlot> slots;
-        std::atomic<float> outerSpeakerX{1.f};
+        AtomicSourceArea sourceArea;
         juce::AudioProcessorValueTreeState& state;
 
         JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(VirtualSourceMessenger)

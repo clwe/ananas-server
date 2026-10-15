@@ -4,6 +4,7 @@
 #include <ClientInfo.h>
 #include <juce_graphics/juce_graphics.h>
 #include "SpeakerLayout.h"
+#include "SourceArea.h"
 #include "WFSUtils.h"
 
 namespace ananas::WFS
@@ -45,8 +46,8 @@ namespace ananas::WFS
 
     /**
      * What the renderers and modules need, derived from a SpeakerLayout and the module
-     * list: each module's speaker positions, the outermost speaker's x, and the sources
-     * all WFS modules can render
+     * list: each module's speaker positions, and the sources all WFS modules can
+     * render; plus the source area, which the processor sets.
      */
     struct RenderLayout
     {
@@ -54,9 +55,10 @@ namespace ananas::WFS
 
         [[nodiscard]] juce::var toVar() const;
 
-        // Largest |x| of the WFS array's speakers (and of speakers without a
-        // module); source x-coordinates are scaled to this, for all renderers.
-        float outerSpeakerX{0.f};
+        // Where sources can be; normalised source positions map onto it, for
+        // all renderers. Not derived from the speakers: compute() leaves the
+        // default.
+        SourceArea sourceArea;
         // Sources rendered by every assigned WFS module.
         int numRenderedSources{0};
         // Assigned WFS modules that render fewer sources than the plugin provides.

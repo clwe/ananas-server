@@ -35,7 +35,8 @@ namespace ananas::WFS
 
         juce::AudioProcessorValueTreeState &state;
         VirtualSourceMessenger virtualSourceMessenger;
-        float outerSpeakerX{-1.f};
+        // As last sent; none yet, so the first layout sends the positions.
+        std::optional<SourceArea> sourceArea;
     };
 }
 

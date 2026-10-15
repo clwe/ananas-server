@@ -227,9 +227,14 @@ namespace ananas::WFS::UI
 
         const int numRenderedSources{layout->getProperty(Identifiers::ArrayNumRenderedSourcesPropertyID)};
         const int numLimitingModules{layout->getProperty(Identifiers::ArrayNumLimitingModulesPropertyID)};
-        const float outerSpeakerX{layout->getProperty(Identifiers::ArrayOuterSpeakerXPropertyID)};
+        const SourceArea sourceArea{
+            layout->getProperty(Identifiers::SourceAreaXFromPropertyID),
+            layout->getProperty(Identifiers::SourceAreaXToPropertyID),
+            layout->getProperty(Identifiers::SourceAreaYFromPropertyID),
+            layout->getProperty(Identifiers::SourceAreaYToPropertyID)
+        };
 
-        xyController.setArrayGeometry(outerSpeakerX, numRenderedSources);
+        xyController.setArrayGeometry(sourceArea, numRenderedSources);
         layoutModuleSelectors();
 
         juce::StringArray warnings;
@@ -243,12 +248,14 @@ namespace ananas::WFS::UI
         }
 
         // The smallest limit of the WFS modules in use: ±2.25 m if any runs
-        // firmware from before speaker protocol 1.
+        // firmware from before speaker protocol 1. Those modules clamp source
+        // x to it (and y to -3 ... 10 m, which isn't checked here).
         const float maxPosition{layout->getProperty(Identifiers::ArrayMaxWfsPositionPropertyID)};
-        if (maxPosition > 0.f && outerSpeakerX > maxPosition) {
-            warnings.add("Outer speakers at " + juce::String::fromUTF8("\u00b1") + juce::String{outerSpeakerX, 2} +
-                         " m exceed the modules' range of " + juce::String::fromUTF8("\u00b1") +
-                         juce::String{maxPosition, 2} + " m.");
+        const auto maxSourceX{juce::jmax(std::abs(sourceArea.xFrom), std::abs(sourceArea.xTo))};
+        if (maxPosition > 0.f && maxSourceX > maxPosition) {
+            warnings.add("The source area reaches x = " + juce::String::fromUTF8("\u00b1") + juce::String{maxSourceX, 2} +
+                         " m, beyond the WFS modules' range of " + juce::String::fromUTF8("\u00b1") +
+                         juce::String{maxPosition, 2} + " m: sources further out are clipped.");
         }
 
         arrayWarningLabel.setText(warnings.joinIntoString(" "), juce::dontSendNotification);

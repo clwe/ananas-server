@@ -19,27 +19,6 @@ namespace ananas::WFS
             modulesByIp[m.ip] = &m;
         }
 
-        // Source positions are scaled to the WFS array for both renderers, so
-        // a source is at the same place for both. Speakers of other module
-        // types (e.g. an Ambisonics ring) don't widen it; speakers without a
-        // known module (e.g. empty slots) count, as part of the array. If no
-        // speaker qualifies, e.g. with Ambisonics modules only, all count.
-        const auto isOtherModuleType = [&modulesByIp](const Speaker &s)
-        {
-            const auto it = modulesByIp.find(s.moduleIp);
-            return it != modulesByIp.end() && it->second->info.firmwareType != ::ananas::Utils::FirmwareType::wfsModule;
-        };
-
-        const auto &speakers = speakerLayout.getSpeakers();
-        const auto anyArraySpeaker = std::any_of(speakers.begin(), speakers.end(),
-                                                 [&](const Speaker &s) { return !isOtherModuleType(s); });
-
-        layout.outerSpeakerX = 0.f;
-        for (const auto &s: speakers) {
-            if (anyArraySpeaker && isOtherModuleType(s)) continue;
-            layout.outerSpeakerX = juce::jmax(layout.outerSpeakerX, std::abs(s.position.x));
-        }
-
         layout.numRenderedSources = static_cast<int>(Constants::NumSources);
 
         for (const auto &s: speakerLayout.getSpeakers()) {
@@ -101,7 +80,10 @@ namespace ananas::WFS
     {
         const auto object{new juce::DynamicObject()};
 
-        object->setProperty(Identifiers::ArrayOuterSpeakerXPropertyID, outerSpeakerX);
+        object->setProperty(Identifiers::SourceAreaXFromPropertyID, sourceArea.xFrom);
+        object->setProperty(Identifiers::SourceAreaXToPropertyID, sourceArea.xTo);
+        object->setProperty(Identifiers::SourceAreaYFromPropertyID, sourceArea.yFrom);
+        object->setProperty(Identifiers::SourceAreaYToPropertyID, sourceArea.yTo);
         object->setProperty(Identifiers::ArrayNumRenderedSourcesPropertyID, numRenderedSources);
         object->setProperty(Identifiers::ArrayNumLimitingModulesPropertyID, numLimitingModules);
         object->setProperty(Identifiers::ArrayMaxWfsPositionPropertyID, maxWfsPositionMetres);

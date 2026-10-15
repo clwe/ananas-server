@@ -59,11 +59,12 @@ namespace ananas::WFS
 
     void VirtualSourceMessenger::parameterChanged(const juce::String &parameterID, float newValue)
     {
-        // Scale the virtual source co-ordinate to soundfield dimensions...
+        // Map the virtual source co-ordinate onto the source area.
+        const auto area{sourceArea.load()};
         if (parameterID.endsWith("x")) {
-            newValue = Params::positionXToMetres(newValue, outerSpeakerX.load());
+            newValue = area.toMetres({newValue, 0.f}).x;
         } else {
-            newValue = Params::positionYToMetres(newValue);
+            newValue = area.toMetres({0.f, newValue}).y;
         }
 
         // Indicate that a parameter change message should be sent at the next
@@ -72,9 +73,9 @@ namespace ananas::WFS
         slots[parameterID].changed.store(true);
     }
 
-    void VirtualSourceMessenger::setOuterSpeakerX(const float x)
+    void VirtualSourceMessenger::setSourceArea(const SourceArea &area)
     {
-        outerSpeakerX.store(x);
+        sourceArea.store(area);
     }
 
     void VirtualSourceMessenger::timerCallback()
