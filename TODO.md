@@ -277,6 +277,18 @@ Positions stay on the server; the firmware never stores or hardcodes them.
 
 ## Timing and clocking
 
+- [ ] **Show the switch's PTP status in the switch table.** The PTP monitor
+      answers without error even when nothing is synchronised, e.g.
+      `[{".about":"ports are not running","name":"ptp1"}]` (PTP enabled, but
+      no port linked), or `"i-am-gm":"true"` (the switch is the grandmaster
+      itself, so it reports no offset and a drift of 0, and the time
+      authority isn't leading). `SwitchList::handleResponse` swallows both;
+      `SwitchInfo` parses `i-am-gm` and `gm-clock-id` but doesn't use them.
+      Show a status per switch: the `.about` text, "grandmaster (should
+      follow the time authority)", or "following <gm-clock-id>", next to
+      drift and offset. Both cases happened in a test setup and were only
+      found by querying the switch by hand.
+
 - [ ] Adaptive resampling on the server, so audio devices other than the Teensy
       authority can be used without drift (see
       `../docs-and-dev-notes/clocking-and-resampling.md`).
@@ -327,6 +339,19 @@ Positions stay on the server; the firmware never stores or hardcodes them.
       what differs is changed, so an open module drop-down no longer closes
       when a module announces itself.
 
+- [ ] **Survive the network interface going away.** The server binds its
+      sockets to `LocalInterfaceIP` (192.168.10.10) and joins the multicast
+      groups once, at startup. When the USB Ethernet adapter is unplugged and
+      plugged in again while the plugin runs, macOS recreates the interface,
+      the multicast memberships are gone, and modules announcing on the
+      network no longer show up (seen in a test: the switch saw the module,
+      the plugin didn't, until REAPER was restarted). Detect it (e.g. no
+      announcements for a while, or the interface's index changing) and
+      rebind / rejoin; at least tell the user in the network overview that
+      the interface disappeared and the plugin needs reopening. Related: the
+      same address on two interfaces (e.g. an `lo0` alias left over from
+      testing without a network) makes the plugin listen on the wrong one;
+      worth a warning too.
 - [ ] Authority announcement: check the received packet size, and guard
       `AuthorityInfo` with a lock (written by the listener thread, read by the UI).
 - [ ] Ananas Server plugin: save and restore its state (switches).
