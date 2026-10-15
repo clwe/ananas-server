@@ -34,22 +34,34 @@ namespace ananas::Ambisonics
 
     void DistanceFilter::process(float *samples, const int numSamples, const float distanceMetres)
     {
+        process(samples, numSamples, distanceMetres, Cues{});
+    }
+
+    void DistanceFilter::process(float *samples, const int numSamples, const float distanceMetres, const Cues cues)
+    {
         if (delayLine.empty() || numSamples <= 0) return;
 
         const auto distance{juce::jlimit(0.f, MaxDistanceMetres, distanceMetres)};
-        const auto delaySamples{static_cast<float>(distance / SpeedOfSoundMetresPerSecond * sampleRate)};
-        const auto gain{computeGain(distance)};
+        const auto delaySamples{cues.delay ? static_cast<float>(distance / SpeedOfSoundMetresPerSecond * sampleRate) : 0.f};
+        const auto gain{cues.gain ? computeGain(distance) : 1.f};
 
-        if (!hasPrevious) {
+        // Switching the delay on or off jumps; a sweep over tens of
+        // milliseconds within one block would be a loud chirp.
+        if (!hasPrevious || cues.delay != previousDelayOn) {
             previousDelaySamples = delaySamples;
+        }
+        if (!hasPrevious) {
             previousGain = gain;
             hasPrevious = true;
         }
+        previousDelayOn = cues.delay;
 
         // One-pole lowpass; the cutoff changes slowly with distance, so once
-        // per block is enough.
+        // per block is enough. Off: a coefficient of 1 passes the signal.
         const auto cutoff{std::min(computeCutoffHz(distance), .45f * static_cast<float>(sampleRate))};
-        const auto coefficient{1.f - std::exp(-juce::MathConstants<float>::twoPi * cutoff / static_cast<float>(sampleRate))};
+        const auto coefficient{cues.lowpass
+                                   ? 1.f - std::exp(-juce::MathConstants<float>::twoPi * cutoff / static_cast<float>(sampleRate))
+                                   : 1.f};
 
         const auto size{static_cast<int>(delayLine.size())};
         const auto maxDelay{static_cast<float>(size - 2)};

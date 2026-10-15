@@ -88,6 +88,22 @@ namespace ananas::WFS::UI
             ambisonicsInputSelector
         );
 
+        // Distance cues of encoded sources, each switchable.
+        const std::array<std::tuple<juce::ToggleButton *, const Params::BoolParam *, const char *, const char *>, 3> cues{{
+            {&distanceDelayButton, &Params::AmbisonicsDistanceDelay, "Delay",
+             "Ambisonics: delay sources by their distance from the listener (d / c; Doppler when they move)"},
+            {&distanceGainButton, &Params::AmbisonicsDistanceGain, "Gain",
+             "Ambisonics: attenuate sources with distance (1 / sqrt(d), as WFS)"},
+            {&distanceLowpassButton, &Params::AmbisonicsDistanceLowpass, "Lowpass",
+             "Ambisonics: darken sources with distance (air absorption, as WFS)"},
+        }};
+        for (const auto &[button, param, text, tooltip]: cues) {
+            addChildComponent(button);
+            button->setButtonText(text);
+            button->setTooltip(tooltip);
+            distanceCueAttachments.add(new juce::AudioProcessorValueTreeState::ButtonAttachment(state, param->id, *button));
+        }
+
         // Shown when the array is limited, e.g. by modules that render fewer
         // sources than the plugin provides.
         addAndMakeVisible(arrayWarningLabel);
@@ -148,6 +164,10 @@ namespace ananas::WFS::UI
 
         showModuleSelectorsButton.setBounds(optionsRow.removeFromLeft(300));
         ambisonicsInputSelector.setBounds(optionsRow.removeFromLeft(220).reduced(1, 12));
+        optionsRow.removeFromLeft(8);
+        distanceDelayButton.setBounds(optionsRow.removeFromLeft(70));
+        distanceGainButton.setBounds(optionsRow.removeFromLeft(65));
+        distanceLowpassButton.setBounds(optionsRow.removeFromLeft(85));
         arrayWarningLabel.setBounds(optionsRow);
 
         bounds = bounds.reduced(10);
@@ -191,6 +211,9 @@ namespace ananas::WFS::UI
         // modules.
         xyController.setListenerVisible(hasAmbisonicsModules);
         ambisonicsInputSelector.setVisible(hasAmbisonicsModules);
+        for (auto *button: {&distanceDelayButton, &distanceGainButton, &distanceLowpassButton}) {
+            button->setVisible(hasAmbisonicsModules);
+        }
 
         for (int n{0}; n < modules.size(); ++n) {
             const auto iter{slotModules.find(n)};

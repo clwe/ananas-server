@@ -133,6 +133,26 @@ namespace ananas::WFS
             0
         };
 
+        // Distance cues of encoded Ambisonics sources (see DistanceFilter),
+        // each switchable, e.g. for testing.
+        inline static const BoolParam AmbisonicsDistanceDelay{
+            "ambisonicsDistanceDelay",
+            "Ambisonics distance delay",
+            true
+        };
+
+        inline static const BoolParam AmbisonicsDistanceGain{
+            "ambisonicsDistanceGain",
+            "Ambisonics distance gain",
+            true
+        };
+
+        inline static const BoolParam AmbisonicsDistanceLowpass{
+            "ambisonicsDistanceLowpass",
+            "Ambisonics distance lowpass",
+            true
+        };
+
         static constexpr int AmbisonicsInputEncode{0};
         static constexpr int AmbisonicsInputPassThrough{1};
 

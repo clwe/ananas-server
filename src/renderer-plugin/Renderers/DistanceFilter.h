@@ -13,11 +13,19 @@ namespace ananas::Ambisonics
      *
      * Delay and gain ramp from the previous block's values to the new ones
      * over each block; the first block after prepare() or reset() starts at
-     * its values, without a ramp.
+     * its values, without a ramp. Each cue can be switched off; switching
+     * the delay jumps to the new one rather than sweeping (Doppler) to it.
      */
     class DistanceFilter
     {
     public:
+        struct Cues
+        {
+            bool delay = true;
+            bool gain = true;
+            bool lowpass = true;
+        };
+
         static constexpr float SpeedOfSoundMetresPerSecond{343.f};
         // Longer distances are treated as this: the farthest a source can be
         // from the listener, both within ±10 m, with the source up to 5 m
@@ -39,7 +47,11 @@ namespace ananas::Ambisonics
          * Audio thread: delays, attenuates and lowpasses `samples` in place.
          * @param distanceMetres From the listener at the end of the block;
          * clamped to 0 ... MaxDistanceMetres.
+         * @param cues Which cues to apply; the others are bypassed.
          */
+        void process(float *samples, int numSamples, float distanceMetres, Cues cues);
+
+        // With all cues.
         void process(float *samples, int numSamples, float distanceMetres);
 
     private:
@@ -47,6 +59,7 @@ namespace ananas::Ambisonics
         std::vector<float> delayLine;
         int writePosition{0};
         bool hasPrevious{false};
+        bool previousDelayOn{true};
         float previousDelaySamples{0.f};
         float previousGain{1.f};
         float lowpassState{0.f};

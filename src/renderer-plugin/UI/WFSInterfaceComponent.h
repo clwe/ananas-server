@@ -71,6 +71,9 @@ namespace ananas::WFS::UI
         // Shown while Ambisonics modules are connected.
         juce::ComboBox ambisonicsInputSelector;
         std::unique_ptr<juce::AudioProcessorValueTreeState::ComboBoxAttachment> ambisonicsInputAttachment;
+        // Distance cues of encoded sources; shown with the input selector.
+        juce::ToggleButton distanceDelayButton, distanceGainButton, distanceLowpassButton;
+        juce::OwnedArray<juce::AudioProcessorValueTreeState::ButtonAttachment> distanceCueAttachments;
         juce::ValueTree &persistentTree;
         juce::ValueTree &dynamicTree;
         juce::ValueTree modulesNode;

@@ -287,9 +287,12 @@ Positions stay on the server; the firmware never stores or hardcodes them.
         prefilter, so a source sounds alike on both. d is the 3-D distance
         from the listener (height included). Encode mode only; pass-through
         is untouched. Untested on hardware.
-      - Open: whether the delay should be optional (it adds latency that
-        differs from WFS, where focused sources get up to ~83 ms and
-        virtual ones only relative delays); near-field (NFC-HOA) encoding
+      - Done: each cue is a plugin parameter (`ambisonicsDistanceDelay`,
+        `…Gain`, `…Lowpass`, default on), with toggles in the WFS tab next
+        to the Ambisonics input selector. Switching the delay jumps instead
+        of sweeping. The delay adds latency that differs from WFS (focused
+        sources get up to ~83 ms there, virtual ones only relative delays).
+      - Open: near-field (NFC-HOA) encoding
         with per-order filters, which only works for sources outside the
         reference radius.
 

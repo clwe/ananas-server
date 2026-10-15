@@ -611,6 +611,12 @@ juce::AudioProcessorValueTreeState::ParameterLayout PluginProcessor::createParam
         ananas::WFS::Params::AmbisonicsInput.defaultIndex
     ));
 
+    for (const auto *cue: {&ananas::WFS::Params::AmbisonicsDistanceDelay,
+                           &ananas::WFS::Params::AmbisonicsDistanceGain,
+                           &ananas::WFS::Params::AmbisonicsDistanceLowpass}) {
+        params.add(std::make_unique<juce::AudioParameterBool>(cue->id, cue->name, cue->defaultValue));
+    }
+
     params.add(std::make_unique<juce::AudioParameterBool>(
         ananas::WFS::Params::ShowModuleSelectors.id,
         ananas::WFS::Params::ShowModuleSelectors.name,

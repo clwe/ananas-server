@@ -113,6 +113,36 @@ public:
             expectWithinAbsoluteError(second.back(), .5f, 1e-2f);
         }
 
+        beginTest("Cues switched off are bypassed");
+        {
+            using Cues = DistanceFilter::Cues;
+            const auto distance = 3.43f; // 10 ms, gain 0.54
+
+            // Delay only: the impulse is late, but at full level and unfiltered.
+            DistanceFilter delayOnly;
+            delayOnly.prepare(sampleRate);
+            std::vector<float> impulse(2048, 0.f);
+            impulse[0] = 1.f;
+            delayOnly.process(impulse.data(), static_cast<int>(impulse.size()), distance, Cues{true, false, false});
+            expectEquals(peakIndex(impulse), 480);
+            expectWithinAbsoluteError(impulse[480], 1.f, 1e-4f);
+
+            // Gain only: right away, attenuated.
+            DistanceFilter gainOnly;
+            gainOnly.prepare(sampleRate);
+            std::vector<float> steady(256, 1.f);
+            gainOnly.process(steady.data(), static_cast<int>(steady.size()), distance, Cues{false, true, false});
+            expectWithinAbsoluteError(steady.front(), DistanceFilter::computeGain(distance), 1e-4f);
+
+            // None: unchanged.
+            DistanceFilter none;
+            none.prepare(sampleRate);
+            std::vector<float> samples{.5f, -.25f, 1.f, 0.f};
+            const auto original = samples;
+            none.process(samples.data(), static_cast<int>(samples.size()), distance, Cues{false, false, false});
+            expect(samples == original);
+        }
+
         beginTest("Distance from the listener in 3-D");
         {
             using ananas::Ambisonics::AmbisonicsRenderer;

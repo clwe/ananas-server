@@ -63,6 +63,11 @@ namespace ananas::Ambisonics
 
         const auto listener{getListenerMetres()};
         const auto area{sourceArea.load()};
+        const DistanceFilter::Cues cues{
+            state.getRawParameterValue(WFS::Params::AmbisonicsDistanceDelay.id)->load() > .5f,
+            state.getRawParameterValue(WFS::Params::AmbisonicsDistanceGain.id)->load() > .5f,
+            state.getRawParameterValue(WFS::Params::AmbisonicsDistanceLowpass.id)->load() > .5f
+        };
 
         for (size_t s{0}; s < NumSources && static_cast<int>(s) < input.getNumChannels(); ++s) {
             const auto index{static_cast<uint>(s)};
@@ -78,7 +83,7 @@ namespace ananas::Ambisonics
             // announced in prepare().
             sourceBuffer.setSize(1, numSamples, false, false, true);
             sourceBuffer.copyFrom(0, 0, input, static_cast<int>(s), 0, numSamples);
-            distanceFilters[s].process(sourceBuffer.getWritePointer(0), numSamples, computeDistance(source, z, listener));
+            distanceFilters[s].process(sourceBuffer.getWritePointer(0), numSamples, computeDistance(source, z, listener), cues);
 
             std::array<float, NumChannels> target{};
             if (horizontal < 1e-2f && std::abs(z) < 1e-2f) {
