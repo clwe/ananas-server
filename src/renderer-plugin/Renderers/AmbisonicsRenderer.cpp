@@ -29,8 +29,9 @@ namespace ananas::Ambisonics
 
     void AmbisonicsRenderer::prepare(const double sampleRate, const int samplesPerBlock)
     {
-        juce::ignoreUnused(sampleRate, samplesPerBlock);
         for (auto &g: gains) g.fill(0.f);
+        for (auto &filter: distanceFilters) filter.prepare(sampleRate);
+        sourceBuffer.setSize(1, samplesPerBlock);
     }
 
     juce::Point<float> AmbisonicsRenderer::getListenerMetres() const
@@ -73,6 +74,12 @@ namespace ananas::Ambisonics
             const auto z{state.getRawParameterValue(WFS::Params::getVirtualSourcePositionParamID(index, WFS::SourcePositionAxis::Z))->load()};
             const auto horizontal{source.getDistanceFrom(listener)};
 
+            // Doesn't reallocate unless the host sends a larger block than
+            // announced in prepare().
+            sourceBuffer.setSize(1, numSamples, false, false, true);
+            sourceBuffer.copyFrom(0, 0, input, static_cast<int>(s), 0, numSamples);
+            distanceFilters[s].process(sourceBuffer.getWritePointer(0), numSamples, computeDistance(source, z, listener));
+
             std::array<float, NumChannels> target{};
             if (horizontal < 1e-2f && std::abs(z) < 1e-2f) {
                 // At the listening point: no direction; omnidirectional.
@@ -87,7 +94,7 @@ namespace ananas::Ambisonics
             // Ramp from the previous block's gains to avoid zipper noise when
             // sources or the listener move.
             for (size_t ch{0}; ch < NumChannels; ++ch) {
-                stream.addFromWithRamp(static_cast<int>(ch), 0, input.getReadPointer(static_cast<int>(s)), numSamples, gains[s][ch], target[ch]);
+                stream.addFromWithRamp(static_cast<int>(ch), 0, sourceBuffer.getReadPointer(0), numSamples, gains[s][ch], target[ch]);
             }
             gains[s] = target;
         }
@@ -131,6 +138,12 @@ namespace ananas::Ambisonics
     {
         const auto d{source - listener};
         return std::atan2(-d.x, d.y);
+    }
+
+    float AmbisonicsRenderer::computeDistance(const juce::Point<float> source, const float z, const juce::Point<float> listener)
+    {
+        const auto horizontal{source.getDistanceFrom(listener)};
+        return std::sqrt(horizontal * horizontal + z * z);
     }
 
     float AmbisonicsRenderer::computeElevation(const juce::Point<float> source, const float z, const juce::Point<float> listener)

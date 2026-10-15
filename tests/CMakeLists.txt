@@ -17,6 +17,7 @@ target_sources(ananas_tests
         ValueTreeUtilsTests.cpp
         AmbisonicEncoderTests.cpp
         AmbisonicsRendererTests.cpp
+        DistanceFilterTests.cpp
         ${CMAKE_SOURCE_DIR}/src/renderer-plugin/RenderLayout.cpp
         ${CMAKE_SOURCE_DIR}/src/renderer-plugin/SpeakerLayout.cpp
         ${CMAKE_SOURCE_DIR}/src/renderer-plugin/LinearArray.cpp
@@ -26,6 +27,7 @@ target_sources(ananas_tests
         ${CMAKE_SOURCE_DIR}/src/renderer-plugin/IemLayout.cpp
         ${CMAKE_SOURCE_DIR}/src/renderer-plugin/SourceArea.cpp
         ${CMAKE_SOURCE_DIR}/src/renderer-plugin/Renderers/AmbisonicEncoder.cpp
+        ${CMAKE_SOURCE_DIR}/src/renderer-plugin/Renderers/DistanceFilter.cpp
         ${CMAKE_SOURCE_DIR}/src/renderer-plugin/Renderers/AmbisonicsRenderer.cpp
         ${CMAKE_SOURCE_DIR}/src/renderer-plugin/Renderers/AmbisonicsControlMessenger.cpp
 )

@@ -4,13 +4,14 @@
 #include <juce_audio_processors/juce_audio_processors.h>
 #include "Renderer.h"
 #include "AmbisonicsControlMessenger.h"
+#include "DistanceFilter.h"
 #include "../WFSUtils.h"
 
 namespace ananas::Ambisonics
 {
     /**
-     * Ambisonics: encodes the sources, as seen from the listening point, to an
-     * Ambisonic signal (or passes one through from the host), which the
+     * Ambisonics: encodes the sources, as seen from the listening point and
+     * with their distance cues (see DistanceFilter), to an Ambisonic signal (or passes one through from the host), which the
      * modules decode for their own speakers. Sends the modules the listener
      * position and the reference radius.
      */
@@ -55,6 +56,12 @@ namespace ananas::Ambisonics
         static float computeAzimuth(juce::Point<float> source, juce::Point<float> listener);
 
         /**
+         * Distance of a source at height z (metres) from the listener, who
+         * is at height 0, in 3-D.
+         */
+        static float computeDistance(juce::Point<float> source, float z, juce::Point<float> listener);
+
+        /**
          * Elevation of a source at height z (metres) as seen from the
          * listener, who is at height 0, in radians, up positive.
          */
@@ -84,6 +91,10 @@ namespace ananas::Ambisonics
         bool shouldResendControlMessages{false};
         // Audio thread only: the gains used at the end of the previous block.
         std::array<std::array<float, NumChannels>, NumSources> gains{};
+        // Audio thread only (prepared before): one per source, and a source
+        // signal after its filter.
+        std::array<DistanceFilter, NumSources> distanceFilters;
+        juce::AudioBuffer<float> sourceBuffer;
     };
 }
 

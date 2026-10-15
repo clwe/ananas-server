@@ -278,11 +278,20 @@ Positions stay on the server; the firmware never stores or hardcodes them.
 - [ ] **Decoder for irregular layouts.** With arbitrary speaker layouts (see
       "Speaker layouts"), the firmware's sampling decoder may need to be
       replaced or complemented, e.g. by AllRAD.
-- [ ] **Source distance.** The encoder only uses each source's direction
-      (plane waves), so a source's distance from the listener has no effect.
-      First step: distance gain (and optionally delay); then near-field
-      (NFC-HOA) encoding with per-order filters, which only works for
-      sources outside the reference radius.
+- [ ] **Source distance.** The encoder only used each source's direction
+      (plane waves), so a source's distance from the listener had no effect.
+      - Done (2026-10-15): `DistanceFilter` per source, before encoding:
+        propagation delay d / c (interpolated, ramped per block, so moving
+        sources get Doppler; up to 30 m, ~87 ms), gain 1/√d and a one-pole
+        lowpass at 15 kHz · gain + 5 kHz, both as the WFS firmware's
+        prefilter, so a source sounds alike on both. d is the 3-D distance
+        from the listener (height included). Encode mode only; pass-through
+        is untouched. Untested on hardware.
+      - Open: whether the delay should be optional (it adds latency that
+        differs from WFS, where focused sources get up to ~83 ms and
+        virtual ones only relative delays); near-field (NFC-HOA) encoding
+        with per-order filters, which only works for sources outside the
+        reference radius.
 
 ## Timing and clocking
 

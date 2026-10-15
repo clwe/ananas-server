@@ -54,6 +54,7 @@ target_sources(ananasRenderer
         Renderers/AmbisonicsRenderer.cpp
         Renderers/AmbisonicsControlMessenger.cpp
         Renderers/AmbisonicEncoder.cpp
+        Renderers/DistanceFilter.cpp
         SecondarySourceMessenger.cpp
         VirtualSourceMessenger.cpp
         UI/WFSInterfaceComponent.cpp
