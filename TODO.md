@@ -221,9 +221,14 @@ Positions stay on the server; the firmware never stores or hardcodes them.
         - **Tested on hardware (2026-10-14) with Ambisonics modules:** set
           id echo, direction and symmetry, source height, alignment delay
           and muting of unused outputs all as expected (oscilloscope, no
-          speakers; details in the handover's "Hardware test"). Still open:
-          WFS modules on protocol 1; a hint in the WFS tab that legacy
-          modules clip sources beyond their old range (±2.25 m, −3 … 10 m).
+          speakers; details in the handover's "Hardware test").
+        - **Tested on hardware (2026-10-14) with a WFS module:** delays of
+          virtual sources, speakers beyond 2.25 m, and secondary source
+          selection by facing direction as expected; CPU 90 %. Focused
+          sources come out mirrored in x (firmware, `cx = st + vt` in
+          `faust/wfs.dsp`; reported in the handover). Still open: a hint in
+          the WFS tab that legacy modules clip sources beyond their old
+          range (±2.25 m, −3 … 10 m).
       - **Server side, independent of the firmware: done.**
         - `Speaker` has a height `z` and a facing direction (`Direction`, a
           3-D unit vector, default `(0, -1, 0)` towards the listener), in
