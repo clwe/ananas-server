@@ -117,11 +117,15 @@ namespace ananas::WFS
         // without any speaker are simply unassigned, not a problem.
         for (const auto &[ip, outputs]: speakersByOutput) {
             const auto &module = *modulesByIp.at(ip);
+            // Modules on speaker protocol 1 get gain 0 for unused outputs.
+            const auto isMuted = module.info.speakerProtocol >= 1;
             for (int output = 0; output < module.info.numSpeakers; ++output) {
                 if (outputs.count(output) == 0) {
-                    problems.push_back({Type::outputUnused, Severity::warning, -1, ip,
+                    problems.push_back({Type::outputUnused, isMuted ? Severity::info : Severity::warning, -1, ip,
                                         "Module " + ip + " output " + juce::String{output}
-                                        + " drives no speaker, but still plays."});
+                                        + (isMuted ? " drives no speaker, and is muted."
+                                                   : " drives no speaker, but still plays (the module's "
+                                                     "firmware can't mute it).")});
                 }
             }
         }

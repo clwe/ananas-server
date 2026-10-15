@@ -41,8 +41,9 @@ namespace ananas::WFS
             // A WFS module's speaker above or below the listening plane; WFS
             // is horizontal and ignores the height.
             wfsHeightIgnored,
-            // A module that drives speakers has an output no speaker uses;
-            // it still plays, at the origin. Not tied to one speaker.
+            // A module that drives speakers has an output no speaker uses. On
+            // speaker protocol 1 the server mutes it (info); on older firmware
+            // it still plays, at the origin (warning). Not tied to one speaker.
             outputUnused,
         };
 

@@ -150,6 +150,25 @@ public:
             }
         }
 
+        beginTest("Unused outputs: muted (info) on speaker protocol 1, playing (warning) before");
+        {
+            auto current = makeModule("current", 3);
+            current.info.speakerProtocol = 1;
+            const auto layout = makeLayout({speaker(0, "legacy", 0), speaker(1, "current", 0)});
+            const auto problems = checkLayout(layout, {makeModule("legacy", 2), current});
+
+            for (const auto &p: problems) {
+                if (p.type != Type::outputUnused) continue;
+                if (p.moduleIp == "current") {
+                    expect(p.severity == Severity::info);
+                    expect(p.description.contains("muted"));
+                } else {
+                    expect(p.severity == Severity::warning);
+                }
+            }
+            expectEquals(count(problems, Type::outputUnused), 3); // legacy 1, current 1 and 2
+        }
+
         beginTest("Problems are ordered by speaker, module-level ones last");
         {
             const auto layout = makeLayout({speaker(0, "a", 0), speaker(1, "gone", 0), speaker(2, {}, -1)});
