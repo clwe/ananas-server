@@ -316,6 +316,7 @@ namespace ananas::WFS
         {
         public:
             constexpr static int SpeakerSpacingSectionHeight{50};
+            constexpr static int AmbisonicsRowHeight{32};
 
             constexpr static float NodeDiameter{40.f};
             constexpr static float NodeHalfDiameter{NodeDiameter / 2.f};

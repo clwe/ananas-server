@@ -68,7 +68,8 @@ namespace ananas::WFS::UI
         juce::Slider speakerSpacingSlider;
         juce::Label speakerSpacingLabel;
         juce::Label arrayWarningLabel;
-        // Shown while Ambisonics modules are connected.
+        // Shown while Ambisonics modules are connected, in a row of their own.
+        juce::Label ambisonicsLabel;
         juce::ComboBox ambisonicsInputSelector;
         std::unique_ptr<juce::AudioProcessorValueTreeState::ComboBoxAttachment> ambisonicsInputAttachment;
         // Distance cues of encoded sources; shown with the input selector.

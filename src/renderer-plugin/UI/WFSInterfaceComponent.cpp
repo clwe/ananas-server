@@ -79,6 +79,8 @@ namespace ananas::WFS::UI
 
         // Ambisonics input: encode the sources, or pass an Ambisonic signal
         // through.
+        addChildComponent(ambisonicsLabel);
+        ambisonicsLabel.setText("Ambisonics", juce::dontSendNotification);
         addChildComponent(ambisonicsInputSelector);
         ambisonicsInputSelector.addItemList(Params::AmbisonicsInput.choices, 1);
         ambisonicsInputSelector.setTooltip(Params::AmbisonicsInput.name);
@@ -162,13 +164,20 @@ namespace ananas::WFS::UI
         numModulesSelector.setBounds(optionsRow.removeFromRight(75).reduced(1, 12));
         numModulesLabel.setBounds(optionsRow.removeFromRight(200));
 
-        showModuleSelectorsButton.setBounds(optionsRow.removeFromLeft(300));
-        ambisonicsInputSelector.setBounds(optionsRow.removeFromLeft(220).reduced(1, 12));
-        optionsRow.removeFromLeft(8);
-        distanceDelayButton.setBounds(optionsRow.removeFromLeft(70));
-        distanceGainButton.setBounds(optionsRow.removeFromLeft(65));
-        distanceLowpassButton.setBounds(optionsRow.removeFromLeft(85));
+        showModuleSelectorsButton.setBounds(optionsRow.removeFromLeft(220));
         arrayWarningLabel.setBounds(optionsRow);
+
+        // The Ambisonics input and distance cues, below, while Ambisonics
+        // modules are connected.
+        if (ambisonicsInputSelector.isVisible()) {
+            auto ambisonicsRow{bounds.removeFromTop(Dimensions::AmbisonicsRowHeight).reduced(6, 0)};
+            ambisonicsLabel.setBounds(ambisonicsRow.removeFromLeft(100));
+            ambisonicsInputSelector.setBounds(ambisonicsRow.removeFromLeft(220).reduced(1, 4));
+            ambisonicsRow.removeFromLeft(12);
+            distanceDelayButton.setBounds(ambisonicsRow.removeFromLeft(80));
+            distanceGainButton.setBounds(ambisonicsRow.removeFromLeft(75));
+            distanceLowpassButton.setBounds(ambisonicsRow.removeFromLeft(100));
+        }
 
         bounds = bounds.reduced(10);
         xyController.setBounds(bounds);
@@ -210,6 +219,8 @@ namespace ananas::WFS::UI
         // The listener and the Ambisonics input only matter for Ambisonics
         // modules.
         xyController.setListenerVisible(hasAmbisonicsModules);
+        const auto ambisonicsRowChanged{ambisonicsInputSelector.isVisible() != hasAmbisonicsModules};
+        ambisonicsLabel.setVisible(hasAmbisonicsModules);
         ambisonicsInputSelector.setVisible(hasAmbisonicsModules);
         for (auto *button: {&distanceDelayButton, &distanceGainButton, &distanceLowpassButton}) {
             button->setVisible(hasAmbisonicsModules);
@@ -219,6 +230,9 @@ namespace ananas::WFS::UI
             const auto iter{slotModules.find(n)};
             modules[n]->setAvailableModules(ips, labels, iter != slotModules.end() ? iter->second : juce::String{});
         }
+
+        // The Ambisonics row takes room from the XY view.
+        if (ambisonicsRowChanged) resized();
     }
 
     void WFSInterfaceComponent::updateArrayLayout(const juce::var &var)
