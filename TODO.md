@@ -218,9 +218,12 @@ Positions stay on the server; the firmware never stores or hardcodes them.
         - `tools/fake_module.py --speaker-protocol 1` (outside the repo, in
           `Ananas/tools`) announces protocol 1, prints the bundles it gets
           and echoes the set id, for testing without the firmware.
-        - Still open: test with the firmware once it implements the
-          handover; a hint in the WFS tab that legacy modules clip sources
-          beyond their old range (±2.25 m, −3 … 10 m).
+        - **Tested on hardware (2026-10-14) with Ambisonics modules:** set
+          id echo, direction and symmetry, source height, alignment delay
+          and muting of unused outputs all as expected (oscilloscope, no
+          speakers; details in the handover's "Hardware test"). Still open:
+          WFS modules on protocol 1; a hint in the WFS tab that legacy
+          modules clip sources beyond their old range (±2.25 m, −3 … 10 m).
       - **Server side, independent of the firmware: done.**
         - `Speaker` has a height `z` and a facing direction (`Direction`, a
           3-D unit vector, default `(0, -1, 0)` towards the listener), in
